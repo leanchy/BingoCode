@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+#Get your current working directory and export it as an environment variable.
+export CALLER_DIR="${CALLER_DIR:-$(pwd -W 2>/dev/null || pwd)}"
+
+# ── 首次部署：将默认 bingo 配置复制到 ~/.claude/bingo/ ──
+_BINGO_CONFIG_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+_BINGO_DIR="$_BINGO_CONFIG_DIR/bingo"
+_BINGO_TARGET="$_BINGO_DIR/settings.json"
+_BINGO_SRC="$ROOT_DIR/config/bingo-defaults/settings.json"
+
+if [ ! -f "$_BINGO_TARGET" ] && [ -f "$_BINGO_SRC" ]; then
+  mkdir -p "$_BINGO_DIR"
+  cp "$_BINGO_SRC" "$_BINGO_TARGET" 2>/dev/null && \
+    echo "[claude] 首次启动：已部署默认配置到 $_BINGO_TARGET" || true
+fi
+
+cd "$ROOT_DIR"
+
+# When spawned by the desktop/web server as a child CLI process,
+# skip .env loading — the server has already set the correct env
+# via bingo/settings.json. Loading .env would re-inject stale
+# provider keys (e.g., a MiniMax key as ANTHROPIC_API_KEY) that
+# override the active provider config.
+if [[ "${CC_HAHA_SKIP_DOTENV:-0}" == "1" ]]; then
+  # Bun auto-loads .env by default; explicitly point to /dev/null to suppress.
+  ENV_FILE_FLAG="--env-file=/dev/null"
+elif [[ -f .env ]]; then
+  ENV_FILE_FLAG="--env-file=.env"
+else
+  ENV_FILE_FLAG=""
+fi
+
+# Force recovery CLI (simple readline REPL, no Ink TUI)
+if [[ "${CLAUDE_CODE_FORCE_RECOVERY_CLI:-0}" == "1" ]]; then
+  exec bun $ENV_FILE_FLAG ./src/localRecoveryCli.ts "$@"
+fi
+
+# Default: full CLI with Ink TUI
+exec bun $ENV_FILE_FLAG ./src/entrypoints/cli.tsx "$@"

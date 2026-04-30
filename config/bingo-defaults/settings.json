@@ -1,0 +1,6 @@
+{
+  "env": {
+    "ANTHROPIC_AUTH_TOKEN": "pending-provider-setup",
+    "ANTHROPIC_BASE_URL": "http://127.0.0.1:3456"
+  }
+}

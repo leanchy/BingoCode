@@ -1,0 +1,207 @@
+version: 2
+
+# Provider 预设配置
+# fields 数组声明新增时需填写的字段
+# key: 'name' | 'apiKey' | 'baseUrl' 直接映射到顶层字段，其余存入 extra.<key>
+# secret: true 时前端使用密码掩码显示
+#
+# modelsUrl: 相对于 baseUrl 的模型列表路径，空字符串表示不支持动态拉取
+# modelsAuthStyle: bearer → Authorization: Bearer <apiKey>
+#                  x-api-key → x-api-key: <apiKey> + anthropic-version header
+# modelsDataPath: 响应 JSON 中模型数组的字段名（几乎总是 'data'）
+
+presets:
+  - id: official
+    name: Claude Official
+    baseUrl: ''
+    apiFormat: anthropic
+    needsApiKey: false
+    websiteUrl: https://www.anthropic.com/claude-code
+    modelsUrl: /v1/models
+    modelsAuthStyle: x-api-key
+    modelsDataPath: data
+    fields:
+      - key: name
+        label: Provider 昵称
+        required: true
+        secret: false
+        placeholder: 'e.g. Claude Official'
+
+  - id: openai
+    name: OpenAI
+    baseUrl: https://api.openai.com/v1
+    apiFormat: openai_chat
+    needsApiKey: true
+    websiteUrl: https://platform.openai.com
+    modelsUrl: /v1/models
+    modelsAuthStyle: bearer
+    modelsDataPath: data
+    fields:
+      - key: name
+        label: Provider 昵称
+        required: true
+        secret: false
+        placeholder: 'e.g. My OpenAI'
+      - key: apiKey
+        label: API Key
+        required: true
+        secret: true
+        placeholder: 'sk-...'
+      - key: baseUrl
+        label: Base URL (Optional)
+        required: false
+        secret: false
+        default: https://api.openai.com/v1
+        placeholder: 'https://api.openai.com/v1'
+
+  - id: gemini
+    name: Google Gemini
+    baseUrl: https://generativelanguage.googleapis.com/v1beta/openai
+    apiFormat: openai_chat
+    needsApiKey: true
+    websiteUrl: https://aistudio.google.com
+    modelsUrl: /v1/models
+    modelsAuthStyle: bearer
+    modelsDataPath: data
+    fields:
+      - key: name
+        label: Provider 昵称
+        required: true
+        secret: false
+        placeholder: 'e.g. My Gemini'
+      - key: apiKey
+        label: API Key
+        required: true
+        secret: true
+        placeholder: 'Gemini API Key'
+
+  - id: mistral
+    name: Mistral AI
+    baseUrl: https://api.mistral.ai/v1
+    apiFormat: openai_chat
+    needsApiKey: true
+    websiteUrl: https://console.mistral.ai
+    modelsUrl: /v1/models
+    modelsAuthStyle: bearer
+    modelsDataPath: data
+    fields:
+      - key: name
+        label: Provider 昵称
+        required: true
+        secret: false
+        placeholder: 'e.g. My Mistral'
+      - key: apiKey
+        label: API Key
+        required: true
+        secret: true
+        placeholder: 'Mistral API Key'
+
+  - id: deepseek
+    name: DeepSeek
+    baseUrl: https://api.deepseek.com
+    apiFormat: openai_chat
+    needsApiKey: true
+    websiteUrl: https://platform.deepseek.com
+    modelsUrl: /v1/models
+    modelsAuthStyle: bearer
+    modelsDataPath: data
+    fields:
+      - key: name
+        label: Provider 昵称
+        required: true
+        secret: false
+        placeholder: 'e.g. My DeepSeek'
+      - key: apiKey
+        label: API Key
+        required: true
+        secret: true
+        placeholder: 'sk-...'
+
+  - id: zhipuglm
+    name: Zhipu GLM
+    baseUrl: https://open.bigmodel.cn/api/paas/v4
+    apiFormat: openai_chat
+    needsApiKey: true
+    websiteUrl: https://open.bigmodel.cn
+    modelsUrl: /models
+    modelsAuthStyle: bearer
+    modelsDataPath: data
+    fields:
+      - key: name
+        label: Provider 昵称
+        required: true
+        secret: false
+        placeholder: 'e.g. My GLM'
+      - key: apiKey
+        label: API Key
+        required: true
+        secret: true
+        placeholder: '智谱 API Key'
+
+  - id: kimi
+    name: Kimi
+    baseUrl: https://api.moonshot.cn/v1
+    apiFormat: openai_chat
+    needsApiKey: true
+    websiteUrl: https://platform.moonshot.cn
+    modelsUrl: /models
+    modelsAuthStyle: bearer
+    modelsDataPath: data
+    fields:
+      - key: name
+        label: Provider 昵称
+        required: true
+        secret: false
+        placeholder: 'e.g. My Kimi'
+      - key: apiKey
+        label: API Key
+        required: true
+        secret: true
+        placeholder: 'Moonshot API Key'
+
+  - id: minimax
+    name: MiniMax
+    baseUrl: https://api.minimaxi.com/v1
+    apiFormat: openai_chat
+    needsApiKey: true
+    websiteUrl: https://platform.minimaxi.com
+    modelsUrl: /models
+    modelsAuthStyle: bearer
+    modelsDataPath: data
+    fields:
+      - key: name
+        label: Provider 昵称
+        required: true
+        secret: false
+        placeholder: 'e.g. My MiniMax'
+      - key: apiKey
+        label: API Key
+        required: true
+        secret: true
+        placeholder: 'MiniMax API Key'
+
+  - id: custom
+    name: Custom
+    baseUrl: ''
+    apiFormat: openai_chat
+    needsApiKey: true
+    websiteUrl: ''
+    modelsUrl: /v1/models
+    modelsAuthStyle: bearer
+    modelsDataPath: data
+    fields:
+      - key: name
+        label: Provider 昵称
+        required: true
+        secret: false
+        placeholder: 'e.g. My Custom Provider'
+      - key: baseUrl
+        label: Base URL
+        required: true
+        secret: false
+        placeholder: 'https://your-api-endpoint.com/v1'
+      - key: apiKey
+        label: API Key
+        required: false
+        secret: true
+        placeholder: '（可选）API Key'
