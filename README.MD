@@ -1,3 +1,78 @@
+## 🚀 BingoCode Installation Guide
+
+### **Step 1: Check Environment**
+First, we need to verify if **npm** is already installed on your computer.
+* Open your terminal (CMD or PowerShell) and enter the following command:
+```bash
+npm -v
+```
+> **Results:**
+> * ✅ If a version number appears (e.g., `10.x.x`), skip to **Step 3**.
+> * ❌ If you see "not recognized as an internal or external command," proceed to **Step 2**.
+
+---
+
+### **Step 2: Install NodeJS/npm**
+If the environment is missing, you can quickly install it via the Windows Package Manager:
+1.  Run the installation command:
+    ```bash
+    winget install OpenJS.NodeJS.LTS
+    ```
+2.  **Important:** Once the installation is complete, you **must close all current CMD windows and reopen them** for the environment variables to take effect.
+
+---
+
+### **Step 3: Install BingoCode**
+With the environment ready, install the tool globally:
+```bash
+npm install -g bingocode
+```
+
+---
+
+### **Step 4: Start BingoCode Service**
+After installation, you need to launch the local backend service:
+1.  In the terminal, enter:
+    ```bash
+    bingo
+    ```
+2.  **Key Point:** Once the service starts, **keep this window open**. Closing the window will cause the plugin features to stop working.
+
+---
+
+### **Step 5: Configure Model Provider**
+Now we need to connect a "brain" to BingoCode:
+1.  Open the BingoCode interface, go to **API Configuration** -> click **Add Provider**.
+2.  Select **Deepseek** (or any other AI provider you use).
+3.  Enter your **API Key**.
+4.  Click **Connectivity Test**.
+    > ✅ **Note:** Configuration is successful only when it displays "Normal" or "Passed."
+
+---
+
+### **Step 6: Configure Slots**
+To ensure high-quality code generation, you must complete the slot mapping:
+1.  Navigate to the **Slot Configuration** interface.
+2.  **Core Requirement:** It is recommended to configure all **4 slots**, as they correspond to different code generation logics.
+3.  Ensure each slot is linked to the Provider you successfully configured in the previous step.
+
+---
+
+### **Step 7: Start Chatting**
+Everything is set!
+1.  Click **New Session**.
+2.  Describe your requirements in the input box, and BingoCode will begin generating code for you.
+
+> **CMD Shortcuts:**
+```bash
+bingo       # Service Console
+bingocode   # Chat Window
+```
+
+---
+Modified From: [https://github.com/NanmiCoder/cc-haha](https://github.com/NanmiCoder/cc-haha)
+```
+
 ## 🚀 BingoCode 安装指南
 
 ### **第一步：检查环境**
