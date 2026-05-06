@@ -1,9 +1,7 @@
-🚀 BingoCode
+
 The modular AI bridge for modern developers.
 
 BingoCode is a lightweight CLI-based orchestrator that brings state-of-the-art LLMs into your local environment. Featuring a robust provider-agnostic architecture and smart slot-mapping, it transforms raw API capabilities into a streamlined, interactive coding experience.
-
-Installation • Features • Quick Start
 
 
 ## 🚀 BingoCode: Quick Start
