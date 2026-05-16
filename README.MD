@@ -36,7 +36,7 @@ npm install -g bingocode
 
 **Shortcuts:**
 *   `bingo` — Start Backend Service
-*   `bingocode` — Open Chat Interface
+*   `bingocode/claude` — Open Chat Interface
 
 ---
 *Source: [github.com/NanmiCoder/cc-haha](https://github.com/NanmiCoder/cc-haha)*
@@ -82,7 +82,7 @@ npm install -g bingocode
 
 **快捷键 | Shortcuts:**
 *   `bingo` : 服务端 (Service)
-*   `bingocode` : 聊天窗 (Chat)
+*   `bingocode/claude` : 聊天窗 (Chat)
 
 ---
 *Ref: [github.com/NanmiCoder/cc-haha](https://github.com/NanmiCoder/cc-haha)*
