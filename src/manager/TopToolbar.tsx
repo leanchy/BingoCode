@@ -5,7 +5,7 @@ import { Chip, ChipRow } from './CliMenuUi.tsx';
 import { useTheme } from '../components/design-system/ThemeProvider.js';
 import { getGlobalConfig, getCurrentProjectConfig, isPathTrusted, checkHasTrustDialogAccepted } from '../utils/config.ts';
 import { getCwd } from '../utils/cwd.js';
-// 更新：按新接口分别导入
+// Update: Import respectively according to the new interface
 import type { ClawdPose } from '../components/LogoV2/Clawd.tsx';
 import { Clawd } from '../components/LogoV2/Clawd.tsx';
 import { AnimatedClawd } from '../components/LogoV2/AnimatedClawd.tsx';
@@ -33,7 +33,7 @@ function ellipsisPath(p: string, keep = 2) {
 export const TopToolbar: React.FC<Props> = memo(({ ready, page, animEnabled, tipsEnabled }) => {
   const [theme] = useTheme();
 
-  // 仅在 ready 时读取配置与信任状态
+  // Only read config and trust status when ready
   const { cwd, trustAccepted, trustedPath, projectName } = useMemo(() => {
     if (!ready) {
       return { cwd: '', trustAccepted: undefined as undefined|boolean, trustedPath: undefined as undefined|boolean, projectName: '' };
@@ -54,10 +54,10 @@ export const TopToolbar: React.FC<Props> = memo(({ ready, page, animEnabled, tip
   const compact = page !== null;
   const cwdShort = useMemo(() => ellipsisPath(cwd, compact ? 2 : 3), [cwd, compact]);
 
-  // 主题名（仅在 ready 时访问全局配置）
+  // Theme name
   const themeLabel = String(theme || (ready ? (getGlobalConfig()?.theme ?? 'system') : '…'));
 
-  // 静态小精灵姿态
+  // Static Clawd pose
   const clawdPose: ClawdPose = useMemo(() => {
     if (!ready) return 'default';
     if (page === null) return animEnabled ? 'arms-up' : 'default';
@@ -69,7 +69,7 @@ export const TopToolbar: React.FC<Props> = memo(({ ready, page, animEnabled, tip
   return (
     <Box flexDirection="column" minHeight={3}>
       <ChipRow>
-        {/* 左侧：小精灵 + 核心状态 */}
+        {/* Left: Clawd + Core Status */}
         <Box>
           <Box marginRight={2}>
             {animEnabled ? <AnimatedClawd /> : <Clawd pose={clawdPose} />}
@@ -87,7 +87,7 @@ export const TopToolbar: React.FC<Props> = memo(({ ready, page, animEnabled, tip
           )}
         </Box>
 
-        {/* 右侧：UI 状态合并显示 */}
+        {/* Right: UI Status merged display */}
         <Box>
           <Chip
             label="UI"

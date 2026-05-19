@@ -3,20 +3,31 @@ import * as React from 'react';
 import { Box, Text } from '../../ink.js';
 import { PromptInputHelpMenu } from '../PromptInput/PromptInputHelpMenu.js';
 export function General() {
-  const $ = _c(2);
+  const $ = _c(3);
   let t0;
   if ($[0] === Symbol.for("react.memo_cache_sentinel")) {
-    t0 = <Box><Text>Claude understands your codebase, makes edits with your permission, and executes commands — right from your terminal.</Text></Box>;
+    t0 = <Box flexDirection="column" gap={1}>
+      <Text>Claude understands your codebase, makes edits with your permission, and executes commands — right from your terminal.</Text>
+      <Box flexDirection="column" paddingTop={1}>
+        <Text bold>English Menu (Default):</Text>
+        <Text>The CLI starts in English. Toggle to Chinese using the 'L' key.</Text>
+        <Text bold paddingTop={1}>Usage:</Text>
+        <Text>• Use arrow keys to navigate the main menu.</Text>
+        <Text>• Press 'N' for a new session or 'R' to resume the latest one.</Text>
+        <Text>• Use '/' for commands like /help, /search, or /compact.</Text>
+      </Box>
+    </Box>;
     $[0] = t0;
   } else {
     t0 = $[0];
   }
   let t1;
-  if ($[1] === Symbol.for("react.memo_cache_sentinel")) {
+  if ($[1] !== t0) {
     t1 = <Box flexDirection="column" paddingY={1} gap={1}>{t0}<Box flexDirection="column"><Box><Text bold={true}>Shortcuts</Text></Box><PromptInputHelpMenu gap={2} fixedWidth={true} /></Box></Box>;
-    $[1] = t1;
+    $[1] = t0;
+    $[2] = t1;
   } else {
-    t1 = $[1];
+    t1 = $[2];
   }
   return t1;
 }

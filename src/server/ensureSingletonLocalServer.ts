@@ -39,14 +39,14 @@
       } catch (e) { lastErr = e; }
       await new Promise(r => setTimeout(r, HEALTH_RETRY_MS));
     }
-    throw new Error(`健康检查超时：${lastErr?.message || 'unknown'}`);
+    throw new Error(`Health check timeout: ${lastErr?.message || 'unknown'}`);
   }
   function resolveBunPath() {
     const fromEnv = process.env.BUN_PATH;
     if (fromEnv) return fromEnv;
     const r = spawnSync('bun', ['--version'], { stdio: 'ignore' });
     if (r.status === 0) return 'bun';
-    throw new Error('未检测到 bun，请安装 https://bun.sh 或设置 BUN_PATH');
+    throw new Error('Bun not detected. Please install https://bun.sh or set BUN_PATH');
   }
 
   async function acquireLease(): Promise<string> {

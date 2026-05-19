@@ -242,6 +242,7 @@ export type GlobalConfig = {
   hasUsedBackgroundTask?: boolean // Whether the user has backgrounded a task (Ctrl+B)
   queuedCommandUpHintCount?: number // Counter for how many times the user has seen the queued command up hint
   diffTool?: DiffTool // Which tool to use for displaying diffs (terminal or vscode)
+  language: 'en' | 'zh' // User's preferred language for CLI menus
 
   // Terminal setup state tracking
   iterm2SetupInProgress?: boolean
@@ -619,6 +620,7 @@ function createDefaultGlobalConfig(): GlobalConfig {
     cachedGrowthBookFeatures: {},
     respectGitignore: true,
     copyFullResponse: false,
+    language: 'en',
   }
 }
 
@@ -663,6 +665,7 @@ export const GLOBAL_CONFIG_KEYS = [
   'prStatusFooterEnabled',
   'remoteControlAtStartup',
   'remoteDialogSeen',
+  'language',
 ] as const
 
 export type GlobalConfigKey = (typeof GLOBAL_CONFIG_KEYS)[number]

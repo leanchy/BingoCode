@@ -326,9 +326,17 @@ export function PromptInputHelpMenu(props) {
   } else {
     t43 = $[83];
   }
+  let t46;
+  if ($[100] !== dimColor) {
+    t46 = <Box><Text dimColor={dimColor}>L to toggle language (en/zh)</Text></Box>;
+    $[100] = dimColor;
+    $[101] = t46;
+  } else {
+    t46 = $[101];
+  }
   let t44;
-  if ($[84] !== t36 || $[85] !== t37 || $[86] !== t38 || $[87] !== t39 || $[88] !== t40 || $[89] !== t41 || $[90] !== t42 || $[91] !== t43) {
-    t44 = <Box flexDirection="column">{t36}{t37}{t38}{t39}{t40}{t41}{t42}{t43}</Box>;
+  if ($[84] !== t36 || $[85] !== t37 || $[86] !== t38 || $[87] !== t39 || $[88] !== t40 || $[89] !== t41 || $[90] !== t42 || $[91] !== t43 || $[102] !== t46) {
+    t44 = <Box flexDirection="column">{t36}{t37}{t38}{t39}{t40}{t41}{t42}{t43}{t46}</Box>;
     $[84] = t36;
     $[85] = t37;
     $[86] = t38;
@@ -337,6 +345,7 @@ export function PromptInputHelpMenu(props) {
     $[89] = t41;
     $[90] = t42;
     $[91] = t43;
+    $[102] = t46;
     $[92] = t44;
   } else {
     t44 = $[92];

@@ -1,14 +1,14 @@
 version: 2
 
-# Provider 预设配置
-# fields 数组声明新增时需填写的字段
-# key: 'name' | 'apiKey' | 'baseUrl' 直接映射到顶层字段，其余存入 extra.<key>
-# secret: true 时前端使用密码掩码显示
+# Provider Preset Configuration
+# fields array declares fields to be filled when adding
+# key: 'name' | 'apiKey' | 'baseUrl' mapped directly to top-level fields, others saved in extra.<key>
+# secret: true uses mask display in frontend
 #
-# modelsUrl: 相对于 baseUrl 的模型列表路径，空字符串表示不支持动态拉取
+# modelsUrl: model list path relative to baseUrl, empty string means dynamic pulling not supported
 # modelsAuthStyle: bearer → Authorization: Bearer <apiKey>
 #                  x-api-key → x-api-key: <apiKey> + anthropic-version header
-# modelsDataPath: 响应 JSON 中模型数组的字段名（几乎总是 'data'）
+# modelsDataPath: record field name for models array in JSON response (almost always 'data')
 
 presets:
   - id: official
@@ -22,7 +22,7 @@ presets:
     modelsDataPath: data
     fields:
       - key: name
-        label: Provider 昵称
+        label: Provider Nickname
         required: true
         secret: false
         placeholder: 'e.g. Claude Official'
@@ -38,7 +38,7 @@ presets:
     modelsDataPath: data
     fields:
       - key: name
-        label: Provider 昵称
+        label: Provider Nickname
         required: true
         secret: false
         placeholder: 'e.g. My OpenAI'
@@ -65,7 +65,7 @@ presets:
     modelsDataPath: data
     fields:
       - key: name
-        label: Provider 昵称
+        label: Provider Nickname
         required: true
         secret: false
         placeholder: 'e.g. My Gemini'
@@ -86,7 +86,7 @@ presets:
     modelsDataPath: data
     fields:
       - key: name
-        label: Provider 昵称
+        label: Provider Nickname
         required: true
         secret: false
         placeholder: 'e.g. My Mistral'
@@ -102,13 +102,13 @@ presets:
     apiFormat: anthropic
     needsApiKey: true
     websiteUrl: https://platform.deepseek.com
-    # 模型列表走 OpenAI 端（/anthropic 路径下无 /v1/models）
+    # Models list follows OpenAI endpoint (no /v1/models under /anthropic)
     modelsUrl: https://api.deepseek.com/v1/models
     modelsAuthStyle: bearer
     modelsDataPath: data
     fields:
       - key: name
-        label: Provider 昵称
+        label: Provider Nickname
         required: true
         secret: false
         placeholder: 'e.g. My DeepSeek'
@@ -129,7 +129,7 @@ presets:
     modelsDataPath: data
     fields:
       - key: name
-        label: Provider 昵称
+        label: Provider Nickname
         required: true
         secret: false
         placeholder: 'e.g. My GLM'
@@ -137,7 +137,7 @@ presets:
         label: API Key
         required: true
         secret: true
-        placeholder: '智谱 API Key (glm-5.1)'
+        placeholder: 'Zhipu API Key (glm-5.1)'
 
   - id: kimi
     name: Kimi
@@ -150,7 +150,7 @@ presets:
     modelsDataPath: data
     fields:
       - key: name
-        label: Provider 昵称
+        label: Provider Nickname
         required: true
         secret: false
         placeholder: 'e.g. My Kimi'
@@ -171,7 +171,7 @@ presets:
     modelsDataPath: data
     fields:
       - key: name
-        label: Provider 昵称
+        label: Provider Nickname
         required: true
         secret: false
         placeholder: 'e.g. My MiniMax'
@@ -192,7 +192,7 @@ presets:
     modelsDataPath: data
     fields:
       - key: name
-        label: Provider 昵称
+        label: Provider Nickname
         required: true
         secret: false
         placeholder: 'e.g. My Custom Provider'
@@ -205,4 +205,4 @@ presets:
         label: API Key
         required: false
         secret: true
-        placeholder: '（可选）API Key'
+        placeholder: '(Optional) API Key'

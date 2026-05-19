@@ -10,26 +10,26 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { ensureSingletonLocalServer } from '../server/ensureSingletonLocalServer.ts';
-// 新增：通用 UI 元素与顶部工具栏
-import { TopBar, BottomBar, Panel, Hint, Kbd, SecondaryMenu } from '../manager/CliMenuUi.tsx';
+// New: Common UI elements and top toolbar
+import { TopBar, BottomBar, Panel, Hint, Kbd, SecondaryMenu, StateDisplay, ScrollBar, truncate, safePadEnd } from '../manager/CliMenuUi.tsx';
 import { WelcomeV2 } from '../components/LogoV2/WelcomeV2.tsx';
 import { TopToolbar } from '../manager/TopToolbar.tsx';
 
-// 主题切换（Hook）
+// Theme switching (Hook)
 import { useTheme } from '../components/design-system/ThemeProvider.js';
-// Markdown 渲染（纯函数，不依赖 AppStateProvider context）
+// Markdown rendering (Pure function, no AppStateProvider context dependency)
 import { applyMarkdown } from '../utils/markdown.js';
 import { Ansi } from '../ink/Ansi.js';
 
-// 配置相关（仅使用可用接口）
+// Config related (using available interfaces)
 import { getGlobalConfig, saveGlobalConfig } from '../utils/config.ts';
 
-// markedSessions 存到 ~/.claude-cli/ 固定目录，不受 cwd 影响
+// markedSessions stored in ~/.claude-cli/ fixed directory, regardless of cwd
 const MARKED_FILE = path.join(os.homedir(), '.claude-cli', 'markedSessions.json');
 
 /**
- * 判断是否处于"官方"模式（没有激活任何自定义 provider）。
- * 逻辑与 ConversationService.shouldMarkManagedOAuth() 保持一致。
+ * Determine if in "official" mode (no custom provider active).
+ * Logic matches ConversationService.shouldMarkManagedOAuth().
  */
 function isOfficialMode(): boolean {
   const configDir = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude');
@@ -42,20 +42,20 @@ function isOfficialMode(): boolean {
       .some(key => typeof env[key] === 'string' && env[key]!.trim().length > 0);
     return !hasProviderEnv;
   } catch {
-    return true; // 读不到 settings.json → 按官方模式处理
+    return true; // Cannot read settings.json -> Treat as official mode
   }
 }
 
 /**
- * 构造子进程的 spawn env。
- * 官方模式下注入 CLAUDE_CODE_ENTRYPOINT=claude-desktop + CLAUDE_CODE_OAUTH_TOKEN，
- * 使新建/恢复的 bingocode 窗口能直接走 OAuth，不显示"未登录"。
+ * Build spawn env for child process.
+ * In official mode, inject CLAUDE_CODE_ENTRYPOINT=claude-desktop + CLAUDE_CODE_OAUTH_TOKEN,
+ * so new/resumed bingocode windows can use OAuth directly.
  */
 async function buildSpawnEnv(): Promise<NodeJS.ProcessEnv> {
   const base = { ...process.env };
   if (!isOfficialMode()) return base;
 
-  // 官方模式：标记为 managed-OAuth，并注入 OAuth token
+  // Official mode: mark as managed-OAuth and inject OAuth token
   base.CLAUDE_CODE_ENTRYPOINT = 'claude-desktop';
   try {
     const { hahaOAuthService } = await import('../server/services/hahaOAuthService.js');
@@ -63,7 +63,7 @@ async function buildSpawnEnv(): Promise<NodeJS.ProcessEnv> {
     if (token) {
       base.CLAUDE_CODE_OAUTH_TOKEN = token;
     } else {
-      // 没有有效 token 时不注入，让 CLI 走正常登录流程
+      // No valid token -> don't inject, use normal login flow
       delete base.CLAUDE_CODE_OAUTH_TOKEN;
     }
   } catch {
@@ -72,32 +72,41 @@ async function buildSpawnEnv(): Promise<NodeJS.ProcessEnv> {
   return base;
 }
 
-// 顶部高度：首页适配 LogoV2 + Toolbar，其它页面更紧凑
+// Top height: Home fits LogoV2 + Toolbar, other pages more compact
 const TOP_H_HOME = Number(process.env.CLI_TOP_H_HOME || 9);
 const TOP_H_COMPACT = Number(process.env.CLI_TOP_H_COMPACT || 6);
-// 底栏高度
+// Bottom bar height
 const BOTTOM_H = Number(process.env.CLI_BOTTOM_H || 3);
 
 const i18nMap = {
-  zh: {
-    menu: {
-      newSession: '新建会话',
-      history: '历史会话',
-      provider: 'API配置',
-      settings: '设置',
-      about: '关于',
-      exit: '退出',
+    zh: {
+      menu: {
+        newSession: 'New Session',
+        history: 'History',
+        provider: 'API Config',
+        settings: 'Settings',
+        about: 'About',
+        exit: 'Exit',
+      },
+      about: 'Bingo CLI - Version Info & About',
+      aboutContent: [
+        'Bingo is an AI assistant terminal client.',
+        'Author: leanchy (Email: leanchy07@outlook.com)',
+        'Github: github.com/leanchy/bingo-claude-code-offline-installer',
+        '1. API Config: Press "P" or select "API Config" to set up your keys.',
+        '2. Model Slots: Configure specific models in the Provider panel.',
+        '3. Background Service: Bingo runs a local server to manage sessions.',
+        '4. Start Chat: Run `bingocode` or `claude` in any terminal to start.',
+      ].join('\n'),
+      mark: '→ Mark Session',
+      unmark: '→ Unmark Session',
+      tipsSimple: 'L Lang | ESC Back | ←→ Menu | ↩ Enter | ? Help',
+      noData: 'No data',
+      emptyHistory: 'Nothing here yet. Start a new session?',
+      deleting: 'Delete this session? (Irreversible)',
+      historyHint: 'Enter to open · j next · k first · q back',
+      helpTitle: 'Shortcuts',
     },
-    about: 'Bingo CLI 终端 - 版本信息与产品说明',
-    mark: '→ 标记会话',
-    unmark: '→ 取消标记',
-    tipsSimple: 'L 语言 | ESC 返回 | ←→ 菜单 | ↩ 进入 | ? 帮助',
-    noData: '暂无数据',
-    emptyHistory: '这里还空空的，不如先新建一个会话？',
-    deleting: '确认删除本会话？（不可恢复）',
-    historyHint: '回车查看详情 · j 下一页 · k 回第一页 · q 返回',
-    helpTitle: '快捷键速查',
-  },
   en: {
     menu: {
       newSession: 'New Session',
@@ -108,6 +117,15 @@ const i18nMap = {
       exit: 'Exit',
     },
     about: 'Bingo CLI Terminal - Version Info & About',
+    aboutContent: [
+      'Bingo is an AI assistant terminal client.',
+      'Author: leanchy (Email: leanchy07@outlook.com)',
+      'Github: github.com/leanchy/bingo-claude-code-offline-installer',
+      '1. API Config: Press "P" or select "API Config" to set up your keys.',
+      '2. Model Slots: Configure specific models in the Provider panel.',
+      '3. Background Service: Bingo runs a local server to manage sessions.',
+      '4. Start Chat: Run `bingocode` or `claude` in any terminal to start.',
+    ].join('\n'),
     mark: '→ Mark Session',
     unmark: '→ Unmark Session',
     tipsSimple: 'L Lang | ESC Back | ←→ Menu | ↩ Enter | ? Help',
@@ -144,11 +162,11 @@ function saveMarkedSessionIds(set: Set<string>) {
     }
     fs.writeFileSync(MARKED_FILE, JSON.stringify([...set]), 'utf-8');
   } catch (err) {
-    console.error('[saveMarkedSessionIds] 写入失败:', err);
+    console.error('[saveMarkedSessionIds] Save failed:', err);
   }
 }
 
-// 消息条目（与后端 MessageEntry 对齐）
+// Message Entry (Aligned with backend MessageEntry)
 type MessageEntry = {
   id: string;
   type: 'user' | 'assistant' | 'system' | 'tool_use' | 'tool_result';
@@ -160,7 +178,7 @@ type MessageEntry = {
   isSidechain?: boolean;
 };
 
-/** 从 MessageEntry.content 提取纯文本 */
+  /** Extract plain text from MessageEntry.content */
 function extractTextFromContent(content: unknown): string {
   if (typeof content === 'string') return content;
   if (Array.isArray(content)) {
@@ -186,7 +204,7 @@ function extractTextFromContent(content: unknown): string {
   return String(content ?? '');
 }
 
-//@C:F ID=F.CM.CliMenuManager;K=F;V=1.5;P=CLI 主菜单;D=CLI;M=cli;S=main;In=;Out=JSX.Element
+//@C:F ID=F.CM.CliMenuManager;K=F;V=1.5;P=CLI Main Menu;D=CLI;M=cli;S=main;In=;Out=JSX.Element
 export const CliMenuManager: React.FC = () => {
   const { stdout } = useStdout();
   const [terminalSize, setTerminalSize] = useState({
@@ -205,7 +223,7 @@ export const CliMenuManager: React.FC = () => {
     return () => { stdout?.off('resize', onResize); };
   }, [stdout]);
 
-  // 动态视口（默认优先使用环境变量，否则使用当前终端宽度并留一点余量）
+  // Dynamic viewport
   const VIEW_W = Number(process.env.CLI_VIEW_W || Math.min(terminalSize.columns, 96));
   const VIEW_H = Number(process.env.CLI_VIEW_H || terminalSize.rows);
 
@@ -214,31 +232,48 @@ export const CliMenuManager: React.FC = () => {
   const [bootErr, setBootErr] = useState<string | null>(null);
   const { exit } = useApp();
 
-  // 主题（全局 Hook）
+  // Theme (Global Hook)
   const [theme, setTheme] = useTheme();
 
-  // 语言
-  const [lang, setLang] = useState<Lang>('zh');
+  // Language
+  const [lang, setLang] = useState<Lang>('en');
+
+  // Config ready probe (avoid Logo early read)
+  const [configReady, setConfigReady] = useState(false);
+
+  useEffect(() => {
+    if (configReady) {
+      try {
+        const cfg = getGlobalConfig();
+        if (cfg.language && (cfg.language === 'en' || cfg.language === 'zh')) {
+          setLang(cfg.language as Lang);
+        }
+      } catch (e) {
+        // Silently fail if config has issues
+      }
+    }
+  }, [configReady]);
+
   const t = i18nMap[lang].menu;
 
-  // 顶部时间
-  const [nowStr, setNowStr] = useState<string>(new Date().toLocaleString(lang === 'zh' ? 'zh-CN' : 'en-US', { hour12: false }));
+  // Top time
+  const [nowStr, setNowStr] = useState<string>(new Date().toLocaleString('en-US', { hour12: false }));
   useEffect(() => {
-    const id = setInterval(() => setNowStr(new Date().toLocaleString(lang === 'zh' ? 'zh-CN' : 'en-US', { hour12: false })), 1000);
+    const id = setInterval(() => setNowStr(new Date().toLocaleString('en-US', { hour12: false })), 1000);
     return () => clearInterval(id);
-  }, [lang]);
+  }, []);
 
-  // 主菜单
+  // Main Menu
   const [page, setPage] = useState<MenuKey | null>(null);
   const menuItems = useMemo(() => menuKeys.map(key => ({ label: t[key], value: key })), [t]);
   const [navIndex, setNavIndex] = useState(0);
 
-  // 新建会话
+  // New Session
   const [newSessionId, setNewSessionId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [createErr, setCreateErr] = useState<string | null>(null);
 
-  // 历史
+  // History
   const [loadingHist, setLoadingHist] = useState(false);
   const [historyList, setHistoryList] = useState<any[]>([]);
   const [historyCursor, setHistoryCursor] = useState<string | null>(null);
@@ -247,66 +282,67 @@ export const CliMenuManager: React.FC = () => {
   const [historyMenuStage, setHistoryMenuStage] = useState<'list'|'window'|'deleteConfirm'>('list');
   const [selectedHistory, setSelectedHistory] = useState<any|null>(null);
 
-  // 历史-消息内容
+  // History Messages
   const [sessionMessages, setSessionMessages] = useState<MessageEntry[]>([]);
   const [loadingMsgs, setLoadingMsgs] = useState(false);
   const [msgsErr, setMsgsErr] = useState<string | null>(null);
-  const [msgsPage, setMsgsPage] = useState(0); // 0=最新页（底部），1=向上翻一页
+  const [msgsPage, setMsgsPage] = useState(0);
 
-  // 标记持久化
+  // Mark Persistence
   const [markedSessionIds, setMarkedSessionIds] = useState<Set<string>>(new Set());
 
-  // 设置页滚动偏移
+  // Settings page scroll offset
   const [settingsOffset, setSettingsOffset] = useState(0);
   const [settingData, setSettingData] = useState<any>(null);
   const [loadingSetting, setLoadingSetting] = useState(false);
   const [setErr, setSetErr] = useState<string | null>(null);
 
-  // 顶部工具栏状态
+  // Top toolbar state
   const [animEnabled, setAnimEnabled] = useState(true);
   const [tipsEnabled, setTipsEnabled] = useState(true);
 
-  // 帮助覆盖层
+  // Help overlay
   const [showHelp, setShowHelp] = useState(false);
 
-  // 快速恢复标志（R）
+  // Keyboard navigation for lists
+  const [listOffset, setListOffset] = useState(0);
+
+  // Quick Resume (R)
   const [quickResumeRequested, setQuickResumeRequested] = useState(false);
 
-  // 计算视口
+  // Compute viewport
   const TOP_H = page === null ? TOP_H_HOME : TOP_H_COMPACT;
-  const MID_H = Math.max(5, VIEW_H - TOP_H - BOTTOM_H);
+  const MID_H = Math.max(5, VIEW_H - TOP_H - BOTTOM_H - (page === null ? 0 : 2));
   const MSGS_PAGE_SIZE = Math.max(1, MID_H - 2);
   const [expandMsgs, setExpandMsgs] = useState(false);
-  // 配置就绪探测（用于避免 Logo 早期读取）
-  const [configReady, setConfigReady] = useState(false);
 
-  // 启动/复用本地唯一服务，并注入 apiUrl（含重试机制）
+  // Boot/Reuse singleton local server (with retry)
   useEffect(() => {
     let mounted = true;
     (async () => {
       if (apiUrl) return;
       const entry = path.resolve(import.meta.dir, '../server/index.ts');
       const MAX_RETRIES = 3;
-      const RETRY_DELAYS = [0, 2000, 5000]; // 首次无延迟，第2次2秒，第3次5秒
+      const RETRY_DELAYS = [0, 2000, 5000]; // 0s, 2s, 5s
       for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
         if (!mounted) return;
-        if (attempt > 0) {
-          setBootErr(`第 ${attempt} 次启动失败，${RETRY_DELAYS[attempt] / 1000}秒后重试...`);
-          await new Promise(r => setTimeout(r, RETRY_DELAYS[attempt]));
-        }
-        if (!mounted) return;
-        try {
-          const handle = await ensureSingletonLocalServer({ serverEntry: entry });
-          if (!mounted) { await handle.stopIfLast(); return; }
-          setApiUrl(handle.baseUrl);
-          setStopIfLast(() => handle.stopIfLast);
-          setBootErr(null);
-          return; // 成功，退出重试
-        } catch (e: any) {
-          if (attempt === MAX_RETRIES - 1) {
-            setBootErr(e.message || '本地服务启动失败');
+          if (attempt > 0) {
+            setBootErr(`Attempt ${attempt} failed, retrying in ${RETRY_DELAYS[attempt] / 1000}s...`);
+            await new Promise(r => setTimeout(r, RETRY_DELAYS[attempt]));
           }
-        }
+          if (!mounted) return;
+          try {
+            const handle = await ensureSingletonLocalServer({ serverEntry: entry });
+            if (!mounted) { await handle.stopIfLast(); return; }
+            setApiUrl(handle.baseUrl);
+            setStopIfLast(() => handle.stopIfLast);
+            setBootErr(null);
+            return; // Success, exit retry
+          } catch (e: any) {
+            if (attempt === MAX_RETRIES - 1) {
+              setBootErr(e.message || 'Local server failed to start');
+            }
+          }
       }
     })();
     return () => { mounted = false; if (stopIfLast) stopIfLast(); };
@@ -325,12 +361,12 @@ export const CliMenuManager: React.FC = () => {
     return () => { cancelled = true; };
   }, []);
 
-  // 初始化标记
+  // Init marks
   useEffect(() => {
     setMarkedSessionIds(loadMarkedSessionIds());
   }, []);
 
-  // 页面切换复位
+  // Page switch reset
   useEffect(() => {
     if (page === 'newSession') {
       setNewSessionId(null);
@@ -340,11 +376,11 @@ export const CliMenuManager: React.FC = () => {
     if (page !== 'settings') {
       setSettingsOffset(0);
     }
-    // 关闭帮助覆盖层
+    // Close help overlay
     setShowHelp(false);
   }, [page]);
 
-  // 历史页进入复位
+  // History page entry reset
   useEffect(() => {
     if (page === 'history') {
       setHistoryMenuStage('list');
@@ -357,14 +393,14 @@ export const CliMenuManager: React.FC = () => {
     }
   }, [page]);
 
-  // 创建会话
+  // Create Session
   const onCreateSession = async () => {
     setCreating(true); setCreateErr(null);
     try {
       const fsReq = require('fs');
       const pathReq = require('path');
       const { spawn } = require('child_process');
-      // 用 import.meta.dir 定位包根，避免 process.cwd() 指向用户目录
+      // Use import.meta.dir for pkg root
       const pkgPath = pathReq.resolve(import.meta.dir, '../../package.json');
       const pkgJson = JSON.parse(fsReq.readFileSync(pkgPath, 'utf-8'));
       const bins = pkgJson.bin || {};
@@ -373,7 +409,7 @@ export const CliMenuManager: React.FC = () => {
         ? (bins['claude-haha'] ? 'claude-haha' : (bins['claude'] ? 'claude' : Object.keys(bins)[0]))
         : (bins['claude-linux'] ? 'claude-linux' : (bins['claude'] ? 'claude' : Object.keys(bins)[0]));
       const spawnCmd = isWin ? 'cmd' : 'sh';
-      // Windows 直接调全局 bingocode 命令，不用 bun 前缀
+      // Windows calls global bingocode directly
       const spawnArgs = isWin ? ['/c', 'start', 'cmd', '/k', 'bingocode'] : ['-c', `${binName}`];
       const spawnEnv = await buildSpawnEnv();
       spawn(spawnCmd, spawnArgs, {
@@ -382,15 +418,15 @@ export const CliMenuManager: React.FC = () => {
         detached: true,
         stdio: 'ignore'
       }).unref();
-      setNewSessionId('CLI已启动: ' + binName);
+      setNewSessionId('Started: ' + binName);
     } catch(e: any) {
-      setCreateErr(e.message || '新建失败');
+      setCreateErr(e.message || 'Failed to create');
     } finally {
       setCreating(false);
     }
   };
 
-  // 历史分页加载
+  // Paged loading for history
   useEffect(() => {
     if (page === 'history' && historyMenuStage === 'list') {
       setLoadingHist(true); setHistErr(null);
@@ -406,7 +442,7 @@ export const CliMenuManager: React.FC = () => {
           }
           setHistoryHasMore(!!pageData?.has_more);
         } catch (e: any) {
-          setHistErr(e.message || '获取历史失败');
+          setHistErr(e.message || 'Failed to fetch history');
         } finally {
           setLoadingHist(false);
         }
@@ -447,7 +483,7 @@ export const CliMenuManager: React.FC = () => {
             setSessionMessages(msgs);
           }
         } catch (e: any) {
-          if (!cancelled) setMsgsErr(e.message || '消息加载失败');
+          if (!cancelled) setMsgsErr(e.message || 'Failed to load messages');
         } finally {
           if (!cancelled) setLoadingMsgs(false);
         }
@@ -460,7 +496,7 @@ export const CliMenuManager: React.FC = () => {
     }
   }, [page, historyMenuStage, selectedHistory, apiUrl]);
 
-  // 设置页数据
+  // Settings data
   useEffect(() => {
     if (page === 'settings') {
       setLoadingSetting(true); setSetErr(null);
@@ -469,7 +505,7 @@ export const CliMenuManager: React.FC = () => {
           const data = (await import('../utils/settings/settings')).default;
           setSettingData(data);
         } catch(e: any) {
-          setSetErr(e.message||'获取设置失败');
+          setSetErr(e.message||'Failed to load settings');
         } finally { setLoadingSetting(false); }
       })();
     } else {
@@ -479,15 +515,21 @@ export const CliMenuManager: React.FC = () => {
     }
   }, [page]);
 
-  // 键盘交互
+  // Keyboard interactions
   useInput((input, key) => {
-    // 语言切换
+    // Language toggle
     if (input === 'l' || input === 'L') {
-      setLang(l => (l === 'zh' ? 'en' : 'zh'));
+      const nextLang = lang === 'zh' ? 'en' : 'zh';
+      setLang(nextLang);
+      try {
+        const cfg = getGlobalConfig();
+        cfg.language = nextLang;
+        saveGlobalConfig(cfg);
+      } catch {}
       return;
     }
 
-    // 主题切换（G）
+    // Theme toggle (G)
     if ((input === 'g' || input === 'G')) {
       const order = ['light', 'dark', 'highContrast'] as const;
       const curr = String(theme || 'light');
@@ -502,27 +544,27 @@ export const CliMenuManager: React.FC = () => {
       return;
     }
 
-    // 顶部动画开关（O）
+    // Top animation toggle (O)
     if (input === 'o' || input === 'O') {
       setAnimEnabled(v => !v);
       return;
     }
-    // 顶部 Tips 开关（T）
+    // Top Tips toggle (T)
     if (input === 't' || input === 'T') {
       setTipsEnabled(v => !v);
       return;
     }
 
-    // 帮助覆盖层（?）
+    // Help overlay (?)
     if (input === '?') {
       setShowHelp(v => !v);
       return;
     }
 
-    // ESC 返回主页面或关闭帮助
+    // ESC to back or close help
     if (key.escape) {
       if (showHelp) { setShowHelp(false); return; }
-      if (page === 'provider') return; // provider 内部处理
+      if (page === 'provider') return; // Handled internally
       setPage(null);
       setHistoryMenuStage('list');
       setSelectedHistory(null);
@@ -533,7 +575,7 @@ export const CliMenuManager: React.FC = () => {
       return;
     }
 
-    // 快速入口：N 新建、R 恢复、P Provider
+    // Quick entries: N New, R Resume, P Provider
     if (input === 'n' || input === 'N') {
       setPage('newSession');
       onCreateSession();
@@ -549,7 +591,7 @@ export const CliMenuManager: React.FC = () => {
       return;
     }
 
-    // 主菜单左右移动
+    // Main menu navigation
     if (!showHelp && key.leftArrow && page === null) {
       setNavIndex(i => (i - 1 + menuItems.length) % menuItems.length);
       return;
@@ -566,22 +608,33 @@ export const CliMenuManager: React.FC = () => {
       return;
     }
 
-    // 历史页快捷键
+    // History shortcuts
     if (!showHelp && page === 'history') {
       if (historyMenuStage === 'list') {
+        const HIST_VISIBLE = MID_H - 2;
+        if (key.downArrow || input === 'j' || input === '\u001b[B') {
+          // Internal SelectInput handles cursor, we just need to track offset for ScrollBar
+          setListOffset(o => Math.min(o + 1, Math.max(0, groupedHistoryItems.length - HIST_VISIBLE)));
+        }
+        if (key.upArrow || input === 'k' || input === '\u001b[A') {
+          setListOffset(o => Math.max(0, o - 1));
+        }
         if (input === 'q') {
           setPage(null);
           setHistoryMenuStage('list');
           setSelectedHistory(null);
           setHistoryCursor(null);
+          setListOffset(0);
           return;
         }
         if (input === 'j' && historyHasMore) {
           setHistoryCursor(historyList[historyList.length - 1]?.id || null);
+          setListOffset(0);
           return;
         }
         if (input === 'k') {
           setHistoryCursor(null);
+          setListOffset(0);
           return;
         }
       } else if (historyMenuStage === 'window') {
@@ -601,7 +654,7 @@ export const CliMenuManager: React.FC = () => {
           handleHistoryMenuAction('__back');
           return;
         }
-        // 消息滚动：↑/k 向上翻页，↓/j 向下翻页
+        // Message scrolling
         if (key.upArrow || input === 'k') {
           setMsgsPage(p => Math.max(0, p - 1));
           return;
@@ -619,7 +672,7 @@ export const CliMenuManager: React.FC = () => {
       }
     }
 
-    // 设置页滚动
+    // Settings scrolling
     if (!showHelp && page === 'settings' && settingData && typeof settingData === 'object') {
       const total = Object.keys(settingData).length;
       const visible = Math.max(1, MID_H - 1);
@@ -632,37 +685,30 @@ export const CliMenuManager: React.FC = () => {
     }
   }, [menuItems, page, historyMenuStage, historyList, historyHasMore, navIndex, sessionMessages, settingData, MID_H, MSGS_PAGE_SIZE, showHelp, theme]);
 
+  function cleanText(text: string): string {
+    return String(text ?? '').replace(/[\n\r]+/g, ' ').replace(/\u001b\[[0-9;]*m/g, '').trim();
+  }
+
   function clampTextLines(text: string, maxWidth: number, maxLines: number) {
-    const lines = String(text ?? '').split(/\r?\n/);
+    const cleaned = cleanText(text);
     const out: string[] = [];
-    let used = 0;
-    for (let i = 0; i < lines.length; i++) {
-      if (out.length >= maxLines) break;
-      const raw = lines[i];
-      if (raw.length <= maxWidth) {
-        out.push(raw);
-      } else {
-        out.push(ellipsis(raw, maxWidth));
-      }
+    if (cleaned.length <= maxWidth) {
+      out.push(cleaned);
+    } else {
+      out.push(cleaned.slice(0, maxWidth - 1) + '…');
     }
     return out.join('\n');
   }
 
-  // 新增：历史列表格式化（单行定宽 + 省略）
-  function ellipsis(str: string, max: number) {
-    const s = String(str ?? '');
-    if (max <= 0) return '';
-    if (s.length <= max) return s;
-    return s.slice(0, Math.max(0, max - 1)) + '…';
-  }
   function makeHistoryLabel(item: any, width: number, isMarked: boolean) {
     const star = isMarked ? '★ ' : '';
-    const ts = String(item.createdAt || '').slice(0, 16).replace('T',' ');
+    const ts = String(item.createdAt || '').slice(0, 16).replace('T', ' ');
     const cnt = String(item.messageCount ?? 0).padStart(3, ' ');
-    // 预留：前缀(星标+时间) + 双空格 + 末尾计数 + 单空格
-    const reserved = star.length + ts.length + 2 + 1 + cnt.length;
+    // Reserved width for: prefix(star+time) + spacer(2) + suffix(1+cnt)
+    // Star is width 2, ts is width 16, spacer is 2, cnt is 3, padding is 1. Total = 24
+    const reserved = 24;
     const titleMax = Math.max(8, width - reserved);
-    const title = ellipsis(String(item.title || ''), titleMax).padEnd(titleMax, ' ');
+    const title = safePadEnd(truncate(String(item.title || ''), titleMax), titleMax);
     return `${star}${ts}  ${title} ${cnt}`;
   }
 
@@ -697,49 +743,56 @@ export const CliMenuManager: React.FC = () => {
   }
 
 
-  // 历史分组展示
-  const groupedHistoryItems = useMemo(() => {
-    if (!historyList || !Array.isArray(historyList)) return [];
-    const now = new Date();
-    const today: any[] = [];
-    const week: any[] = [];
-    const earlier: any[] = [];
-    for (const item of historyList) {
-      const dt = new Date(item.createdAt);
-      const isToday =
-        dt.getFullYear() === now.getFullYear() &&
-        dt.getMonth() === now.getMonth() &&
-        dt.getDate() === now.getDate();
-      const weekStart = new Date(now);
-      weekStart.setDate(now.getDate() - ((now.getDay() + 6) % 7));
-      weekStart.setHours(0, 0, 0, 0);
-      if (isToday) today.push(item);
-      else if (dt >= weekStart) week.push(item);
-      else earlier.push(item);
-    }
-    function groupToItems(group: any[], groupTitle: string) {
-      if (group.length === 0) return [];
-      return [
-        { label: groupTitle, value: `__group_${groupTitle}`, isGroup: true },
-        ...group.map(item => {
-          const isMarked = markedSessionIds.has(item.id);
-          return {
-            label: makeHistoryLabel(item, Math.max(20, VIEW_W - 8), isMarked),
-            value: item.id,
-            color: isMarked ? 'yellow' : undefined,
-          };
-        })
-      ];
-    }
-    const items = [
-      ...groupToItems(today, '—— 今天 ——'),
-      ...groupToItems(week, '—— 本周 ——'),
-      ...groupToItems(earlier, '—— 更早 ——'),
-    ];
-    return items;
-  }, [historyList, markedSessionIds]);
+	  // 历史分组展示
+	  const groupedHistoryItems = useMemo(() => {
+	    if (!historyList || !Array.isArray(historyList)) return [];
+	    const now = new Date();
+	    const today: any[] = [];
+	    const week: any[] = [];
+	    const earlier: any[] = [];
+	    const marked: any[] = [];
 
-  // 标记切换
+	    for (const item of historyList) {
+	      if (markedSessionIds.has(item.id)) {
+	        marked.push(item);
+	        continue;
+	      }
+	      const dt = new Date(item.createdAt);
+	      const isToday =
+	        dt.getFullYear() === now.getFullYear() &&
+	        dt.getMonth() === now.getMonth() &&
+	        dt.getDate() === now.getDate();
+	      const weekStart = new Date(now);
+	      weekStart.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+	      weekStart.setHours(0, 0, 0, 0);
+	      if (isToday) today.push(item);
+	      else if (dt >= weekStart) week.push(item);
+	      else earlier.push(item);
+	    }
+	    function groupToItems(group: any[], groupTitle: string) {
+	      if (group.length === 0) return [];
+	      return [
+	        { label: groupTitle, value: `__group_${groupTitle}`, isGroup: true },
+	        ...group.map(item => {
+	          const isMarked = markedSessionIds.has(item.id);
+	          return {
+	            label: makeHistoryLabel(item, Math.max(20, VIEW_W - 8), isMarked),
+	            value: item.id,
+	            color: isMarked ? 'yellow' : undefined,
+	          };
+	        })
+	      ];
+	    }
+	    const items = [
+	      ...groupToItems(marked, '—— Marked ——'),
+	      ...groupToItems(today, '—— Today ——'),
+	      ...groupToItems(week, '—— This Week ——'),
+	      ...groupToItems(earlier, '—— Earlier ——'),
+	    ];
+	    return items;
+	  }, [historyList, markedSessionIds]);
+
+  // Toggle Mark
   const toggleMarkSession = (sessionId: string) => {
     setMarkedSessionIds(prev => {
       const next = new Set(prev);
@@ -779,7 +832,7 @@ export const CliMenuManager: React.FC = () => {
   };
 
 
-  // 刷新历史
+  // Refresh history
   const refreshHistoryList = () => {
     setLoadingHist(true); setHistErr(null);
     let url = apiUrl + '/api/sessions';
@@ -789,11 +842,11 @@ export const CliMenuManager: React.FC = () => {
       setHistoryCursor(pageData?.first_id || null);
       setHistoryHasMore(!!pageData?.has_more);
     }).catch(e => {
-      setHistErr(e.message || '获取历史失败');
+      setHistErr(e.message || 'Failed to fetch history');
     }).finally(() => setLoadingHist(false));
   };
 
-  // 删除会话
+  // Delete Session
   const handleDeleteSession = (sessionId: string) => {
     const url = apiUrl.replace(/\/+$/, '') + '/api/sessions/' + sessionId;
     axios.delete(url)
@@ -806,18 +859,18 @@ export const CliMenuManager: React.FC = () => {
       });
   };
 
-  // 二级菜单（底栏右侧）
+  // Secondary menu (bottom bar right)
   const secondaryMenu: SecondaryMenu = useMemo(() => {
     if (page === 'history' && historyMenuStage === 'window' && selectedHistory) {
       const isMarked = markedSessionIds.has(selectedHistory.id);
       const markLabel = isMarked ? i18nMap[lang].unmark : i18nMap[lang].mark;
       return {
-        title: lang === 'zh' ? '会话操作' : 'Session Actions',
+        title: 'Session Actions',
         items: [
           { label: markLabel, value: '__toggle_mark' },
-          { label: '→ 继续会话聊天', value: '__continue' },
-          { label: '→ 删除会话聊天', value: '__delete' },
-          { label: '← 返回历史列表', value: '__back' },
+          { label: '→ Continue session', value: '__continue' },
+          { label: '→ Delete session', value: '__delete' },
+          { label: '← Back to list', value: '__back' },
         ],
         onSelect: (item: any) => {
           if (item.value === '__back') {
@@ -837,10 +890,10 @@ export const CliMenuManager: React.FC = () => {
 
     if (page === 'history' && historyMenuStage === 'deleteConfirm' && selectedHistory) {
       return {
-        title: lang === 'zh' ? '删除确认' : 'Confirm Delete',
+        title: 'Confirm Delete',
         items: [
-          { label: lang === 'zh' ? '是，确认删除' : 'Yes, delete', value: '__confirm_delete' },
-          { label: lang === 'zh' ? '否，返回详情' : 'No, back', value: '__cancel_delete' },
+          { label: 'Yes, delete', value: '__confirm_delete' },
+          { label: 'No, back', value: '__cancel_delete' },
         ],
         onSelect: (item: any) => {
           if (item.value === '__cancel_delete') {
@@ -854,34 +907,32 @@ export const CliMenuManager: React.FC = () => {
     return null;
   }, [page, historyMenuStage, selectedHistory, markedSessionIds, lang]);
 
-  // 帮助覆盖层
+  // Help Overlay
   function renderHelpOverlay() {
     return (
       <Box width={VIEW_W} height={MID_H} flexDirection="column">
         <Text color="magenta">{i18nMap[lang].helpTitle}</Text>
         <Text> </Text>
-        <Text color="cyan">N</Text><Text>  新建会话 / New Session</Text>
-        <Text color="cyan">R</Text><Text>  快速恢复最近会话 / Quick Resume</Text>
-        <Text color="cyan">P</Text><Text>  打开 Provider 管理 / Open Provider</Text>
-        <Text color="cyan">G</Text><Text>  切换主题（light/dark/highContrast）</Text>
-        <Text color="cyan">L</Text><Text>  中英切换 / Toggle Language</Text>
-        <Text color="cyan">O</Text><Text>  切换顶部动画开关（显示用）</Text>
-        <Text color="cyan">T</Text><Text>  切换顶部 Tips 开关（显示用）</Text>
-        <Text color="cyan">?</Text><Text>  打开/关闭此帮助</Text>
+        <Text color="cyan">N</Text><Text>  New Session</Text>
+        <Text color="cyan">R</Text><Text>  Quick Resume</Text>
+        <Text color="cyan">P</Text><Text>  Open Provider Config</Text>
+        <Text color="cyan">G</Text><Text>  Toggle Theme (light/dark/highContrast)</Text>
+        <Text color="cyan">L</Text><Text>  Toggle Language (en/zh)</Text>
+        <Text color="cyan">O</Text><Text>  Toggle Top Animation</Text>
+        <Text color="cyan">T</Text><Text>  Toggle Top Tips</Text>
+        <Text color="cyan">?</Text><Text>  Toggle Help</Text>
         <Text> </Text>
-        <Hint>{lang==='zh' ? 'ESC 关闭 · 在任意页面可用' : 'ESC to close · Works anywhere'}</Hint>
+        <Hint>ESC to close · Works anywhere</Hint>
       </Box>
     );
   }
 
-  // 中心内容渲染
+  // Center Content
   function renderCenter() {
     if (showHelp) return renderHelpOverlay();
 
-    // 首页：默认显示欢迎页图像，水平居中（WelcomeV2 固定 58 字符宽）
+    // Home: WelcomeV2 (58 cols wide)
     if (page === null) {
-      // 首页 Panel 无边框无 padding，内容区宽 = VIEW_W = 96
-      // WelcomeV2 宽 58，左偏移 = floor((96 - 58) / 2) = 19
       const WELCOME_W = 58;
       const leftPad = Math.max(0, Math.floor((VIEW_W - WELCOME_W) / 2));
       return (
@@ -891,75 +942,70 @@ export const CliMenuManager: React.FC = () => {
             <WelcomeV2 />
           </Box>
           {!apiUrl && !bootErr && (
-            <Text color="yellow">⏳ 服务启动中...</Text>
+            <StateDisplay type="loading" message="Starting server..." />
           )}
           {bootErr && (
-            <Text color="red">服务启动失败: {bootErr}</Text>
+            <StateDisplay type="error" message={`Server boot failed: ${bootErr}`} />
           )}
         </Box>
       );
     }
 
-    // 新建
+    // New Session
     if (page === 'newSession') {
       return (
         <Box flexDirection="column" width={VIEW_W} height={MID_H}>
-          {creating && <Text color="yellow">新建中...</Text>}
-          {createErr && <Text color="red">新建失败: {createErr}</Text>}
-          {newSessionId && <Text color="green">新建会话: {newSessionId}</Text>}
-          {!creating && !createErr && !newSessionId && <Text dimColor>已进入新建会话页，等待创建结果...</Text>}
+          {creating && <StateDisplay type="loading" message="Creating..." />}
+          {createErr && <StateDisplay type="error" message={`Failed to create: ${createErr}`} />}
+          {newSessionId && <Box alignItems="center" justifyContent="center" flexGrow={1}><Text color="green">New Session: {newSessionId}</Text></Box>}
+          {!creating && !createErr && !newSessionId && <StateDisplay type="empty" message="Entered new session page, waiting for result..." />}
         </Box>
       );
     }
 
-    // 历史
+    // History
     if (page === 'history') {
-      if (histErr) return <Box width={VIEW_W} height={MID_H}><Text color="red">{histErr}</Text></Box>;
+      if (histErr) return <StateDisplay type="error" message={histErr} onRetry={refreshHistoryList} />;
       if (historyMenuStage === 'deleteConfirm' && selectedHistory) {
         const halfH = Math.floor(MID_H / 2);
         const items = [
-          { label: lang === 'zh' ? '是，确认删除' : 'Yes, delete', value: '__confirm_delete' },
-          { label: lang === 'zh' ? '否，返回详情' : 'No, back', value: '__cancel_delete' },
+          { label: 'Yes, Delete', value: '__confirm_delete' },
+          { label: 'No, Back', value: '__cancel_delete' },
         ];
         return (
           <Box width={VIEW_W} height={MID_H} flexDirection="column">
-            <Box height={halfH} flexDirection="column">
-              <Text color="red">{i18nMap[lang].deleting}</Text>
-              <Text>id: {selectedHistory.id}</Text>
-              <Text>标题: {selectedHistory.title}</Text>
-              <Text>创建时间: {selectedHistory.createdAt}</Text>
+            <Box height={halfH} flexDirection="column" paddingX={1} paddingTop={1}>
+              <Text color="red" bold>Confirm Delete?</Text>
+              <Text>Title: {selectedHistory.title || 'Untitled'}</Text>
+              <Text dimColor>Time: {selectedHistory.createdAt?.replace('T',' ')}</Text>
+              <Text dimColor>ID: {selectedHistory.id}</Text>
             </Box>
-            <Box height={MID_H - halfH} flexDirection="column" borderStyle="round" borderColor="red" paddingLeft={1} paddingRight={1}>
-              <Text>{lang === 'zh' ? '删除确认' : 'Confirm Delete'}</Text>
+            <Panel height={MID_H - halfH} borderStyle="round" borderColor="red" paddingX={1}>
               <SelectInput
                 items={items}
                 onSelect={(item) => handleHistoryMenuAction(String(item.value))}
               />
-              <Hint>↩ 执行 · q 返回</Hint>
-            </Box>
+              <Hint>Enter Confirm · q Cancel</Hint>
+            </Panel>
           </Box>
         );
       }
       if (!historyList.length && loadingHist) {
-        return <Box width={VIEW_W} height={MID_H}><Text color="yellow">加载中...</Text></Box>;
+        return <StateDisplay type="loading" message="Loading..." />;
       }
       if (!historyList.length) {
-        return <Box width={VIEW_W} height={MID_H}><Text dimColor>{i18nMap[lang].emptyHistory}</Text></Box>;
+        return <StateDisplay type="empty" message={i18nMap[lang].emptyHistory} />;
       }
 
+      const ACTIONS_H = 6;
+      const LIST_H = Math.max(2, MID_H - ACTIONS_H - 1);
+
       if (historyMenuStage === 'window' && selectedHistory) {
+        // Detailed View with Split
         const isMarked = markedSessionIds.has(selectedHistory.id);
-
-        // ── 信息栏高度固定 3 行（标题 + 元信息 + 提示） ──
-        const INFO_H = 3;
-        const MSGS_H = Math.max(3, MID_H - INFO_H);
-
-        // ── 过滤出可展示的消息（user / assistant / system，跳过 tool_use / tool_result） ──
         const displayMsgs = sessionMessages.filter(
           m => m.type === 'user' || m.type === 'assistant' || m.type === 'system'
         );
-
-        // ── 分页：每页 MSGS_PAGE_SIZE 条消息 ──
         const totalPages = Math.max(1, Math.ceil(displayMsgs.length / MSGS_PAGE_SIZE));
         const safePage = Math.min(msgsPage, totalPages - 1);
         const pageStart = safePage * MSGS_PAGE_SIZE;
@@ -967,151 +1013,177 @@ export const CliMenuManager: React.FC = () => {
 
         return (
           <Box width={VIEW_W} height={MID_H} flexDirection="column">
-            {/* ── 顶部信息栏 ── */}
-            <Box height={INFO_H} flexDirection="column">
-              <Text color={isMarked ? 'yellow' : 'cyan'}>
-                {isMarked ? '★ ' : ''}{selectedHistory.title || 'Untitled'}
-                <Text dimColor>  {selectedHistory.createdAt?.slice(0, 16).replace('T', ' ') || ''} · {displayMsgs.length} msgs</Text>
-              </Text>
-              <Hint>
-                j/↓ 下翻 · k/↑ 上翻 · m 标记 · c 继续 · d 删除 · q 返回
-                {displayMsgs.length > MSGS_PAGE_SIZE ? `  [${safePage + 1}/${totalPages}]` : ''}
-              </Hint>
+            {/* Upper Pane: Preview */}
+            <Box height={LIST_H} flexDirection="column" paddingX={1} overflow="hidden">
+              <Box justifyContent="space-between" marginBottom={0}>
+                <Text color={isMarked ? 'yellow' : 'cyan'} bold>
+                  {isMarked ? '★ ' : ''}{truncate(selectedHistory.title || 'Untitled', VIEW_W - 24)}
+                </Text>
+                <Text dimColor>{selectedHistory.createdAt?.slice(0,16).replace('T',' ')}</Text>
+              </Box>
+
+              <Box flexDirection="column" flexGrow={1} overflow="hidden">
+                {loadingMsgs && <StateDisplay type="loading" message="Loading messages..." />}
+                {msgsErr && <StateDisplay type="error" message={msgsErr} />}
+                {!loadingMsgs && pageMsgs.length === 0 && <StateDisplay type="empty" message="No messages" />}
+                {pageMsgs.map((msg) => {
+                  const text = extractTextFromContent(msg.content);
+                  const roleLabel = msg.type === 'user' ? 'You' : 'Bot';
+                  const roleColor = msg.type === 'user' ? 'green' : 'cyan';
+                  return (
+                    <Box key={msg.id} marginBottom={0} flexDirection="column" height={1} overflow="hidden">
+                      <Text color={roleColor} bold>{roleLabel}: <Text color="white" bold={false}>{clampTextLines(text, VIEW_W - 10, 1)}</Text></Text>
+                    </Box>
+                  );
+                })}
+              </Box>
+              {totalPages > 1 && (
+                <Box justifyContent="center" height={1}>
+                  <Hint>Page {safePage + 1}/{totalPages} (↑↓ to scroll)</Hint>
+                </Box>
+              )}
             </Box>
 
-            {/* ── 消息区 ── */}
-            <Box height={MSGS_H} flexDirection="column">
-              {loadingMsgs && <Text color="yellow">加载消息中...</Text>}
-              {msgsErr && <Text color="red">错误: {msgsErr}</Text>}
-              {!loadingMsgs && !msgsErr && displayMsgs.length === 0 && (
-                <Text dimColor>无消息记录</Text>
-              )}
-              {pageMsgs.map((msg) => {
-                const text = extractTextFromContent(msg.content);
-                if (!text.trim()) return null;
-                const isUser = msg.type === 'user';
-                const isSystem = msg.type === 'system';
-                const roleLabel = isUser ? '👤 You' : isSystem ? '⚙ System' : '🤖 Assistant';
-                const roleColor = isUser ? 'green' : isSystem ? 'gray' : 'cyan';
-                return (
-                  <Box key={msg.id} flexDirection="column" marginBottom={1}>
-                    <Text color={roleColor} bold>{roleLabel}</Text>
-                    {isUser ? (
-                      <Text>{text}</Text>
-                    ) : (
-                      <Ansi>{applyMarkdown(text, theme)}</Ansi>
-                    )}
-                  </Box>
-                );
-              })}
+            <Box height={1} marginBottom={0}><Text dimColor>{'─'.repeat(VIEW_W - 2)}</Text></Box>
+
+            {/* Lower Pane: Actions */}
+            <Box height={ACTIONS_H} paddingX={1} flexDirection="column" overflow="hidden">
+               <Text color="magenta" bold>Actions</Text>
+               <Box marginTop={0} height={ACTIONS_H - 2} overflow="hidden">
+                 <SelectInput
+                   items={secondaryMenu?.items || []}
+                   onSelect={secondaryMenu?.onSelect}
+                 />
+               </Box>
+               <Hint>ESC Back · ↑↓ Select Action · Q/M/C Shortcut</Hint>
             </Box>
           </Box>
         );
       }
 
+	    // History List View (Default)
+	    const HIST_VISIBLE = MID_H - 2;
+	    const start = Math.min(listOffset, Math.max(0, groupedHistoryItems.length - HIST_VISIBLE));
+	    const slicedItems = groupedHistoryItems.slice(start, start + HIST_VISIBLE);
 
-      // 历史列表
-      return (
-        <Box width={VIEW_W} height={MID_H} flexDirection="column">
-          <SelectInput
-            key={`${historyCursor ?? 'first'}:${groupedHistoryItems.length}`}
-            items={groupedHistoryItems}
-            onSelect={item => {
-              if (String(item.value).startsWith('__group_')) return; // 忽略分组标题选择
-              const session = historyList.find(h => h.id === item.value);
-              if (session) {
-                setSelectedHistory(session);
-                setHistoryMenuStage('window');
-              }
-            }}
-            itemComponent={({ isSelected, label }) => {
-              const it = groupedHistoryItems.find(i => i.label === label);
-              const isGroup = it?.isGroup;
-              const color = it?.color;
-              return (
-                <Text color={isGroup ? 'gray' : (color ? color : (isSelected ? 'cyan' : undefined))}>
-                  {label}
-                </Text>
-              )
-            }}
-          />
-          <Hint>{i18nMap[lang].historyHint}</Hint>
-        </Box>
-      );
-    }
+	    return (
+	      <Box width={VIEW_W} height={MID_H} flexDirection="row" position="relative">
+	        <Box flexDirection="column" flexGrow={1} paddingX={1}>
+	          <SelectInput
+	            key={`${historyCursor ?? 'first'}:${slicedItems.length}:${start}`}
+	            items={slicedItems}
+	            onSelect={item => {
+	              if (String(item.value).startsWith('__group_')) return;
+	              const session = historyList.find(h => h.id === item.value);
+	              if (session) {
+	                setSelectedHistory(session);
+	                setHistoryMenuStage('window');
+	              }
+	            }}
+	            itemComponent={({ isSelected, label }) => {
+	              const it = groupedHistoryItems.find(i => i.label === label);
+	              const isGroup = it?.isGroup;
+	              const color = it?.color;
+	              return (
+	                <Box height={1} overflow="hidden">
+	                  <Text wrap="truncate" color={isGroup ? 'gray' : (color ? color : (isSelected ? 'cyan' : undefined))}>
+	                    {isSelected ? '> ' : '  '}{label}
+	                  </Text>
+	                </Box>
+	              )
+	            }}
+	          />
+	        </Box>
+	        <ScrollBar total={groupedHistoryItems.length} offset={start} height={MID_H - 2} />
+	        <Box position="absolute" bottom={0} left={1} width={VIEW_W - 4}>
+	          <Hint>{i18nMap[lang].historyHint}</Hint>
+	        </Box>
+	      </Box>
+	    );
+	  }
 
     // Provider
     if (page === 'provider') {
       if (!apiUrl) {
         return (
           <Box width={VIEW_W} height={MID_H} flexDirection="column">
-            <Text color="yellow">{bootErr ? `服务启动失败: ${bootErr}` : '⏳ 服务启动中，请稍候...'}</Text>
-            <Text dimColor>ESC 返回主菜单</Text>
+            <StateDisplay
+              type={bootErr ? "error" : "loading"}
+              message={bootErr ? `Server boot failed: ${bootErr}` : 'Starting server, please wait...'}
+              onRetry={() => process.exit(1)} // Or another way to trigger reboot
+            />
+            <Text dimColor alignSelf="center">ESC for main menu</Text>
           </Box>
         );
       }
       return (
         <Box width={VIEW_W} height={MID_H} flexDirection="column">
-          <ProviderPanel apiUrl={apiUrl} onBack={() => setPage(null)} />
+          <ProviderPanel apiUrl={apiUrl} height={MID_H} onBack={() => setPage(null)} />
         </Box>
       );
     }
 
-    // 设置
+    // Settings
     if (page === 'settings') {
-      if (loadingSetting) return <Box width={VIEW_W} height={MID_H}><Text color="yellow">加载设置中...</Text></Box>;
-      if (setErr) return <Box width={VIEW_W} height={MID_H}><Text color="red">{setErr}</Text></Box>;
-      if (!settingData || typeof settingData !== 'object') return <Box width={VIEW_W} height={MID_H}><Text dimColor>暂无设置项</Text></Box>;
+      if (loadingSetting) return <StateDisplay type="loading" message="Loading settings..." />;
+      if (setErr) return <StateDisplay type="error" message={setErr} />;
+      if (!settingData || typeof settingData !== 'object') return <StateDisplay type="empty" message="No settings found" />;
       const entries = Object.entries(settingData);
       const visible = Math.max(1, MID_H - 1);
       const start = Math.min(settingsOffset, Math.max(0, entries.length - visible));
       const sliced = entries.slice(start, start + visible);
       return (
         <Box width={VIEW_W} height={MID_H} flexDirection="column">
+          <ScrollBar total={entries.length} offset={start} height={visible - 1} />
           {sliced.map(([k, v]) => <Text key={k}>{k}: {typeof v === 'object' ? JSON.stringify(v) : String(v)}</Text>)}
           <Hint>
-            {lang==='zh' ? '↑/k 与 ↓/j 滚动' : '↑/k and ↓/j to scroll'} · {start+1}-{Math.min(start+visible, entries.length)}/{entries.length}
+            ↑/k and ↓/j scroll · {start+1}-{Math.min(start+visible, entries.length)}/{entries.length}
           </Hint>
         </Box>
       );
     }
 
-    // 关于
+    // About
     if (page === 'about') {
       return (
         <Box width={VIEW_W} height={MID_H} flexDirection="column">
-          <Text>{i18nMap[lang].about}</Text>
-          <Hint>
-            {lang==='zh' ? 'API 地址' : 'API Base'}: {apiUrl}
-          </Hint>
+          <Text color="cyan" bold>{i18nMap[lang].about}</Text>
+          <Box marginTop={1} flexDirection="column">
+            <Text>{(i18nMap[lang] as any).aboutContent}</Text>
+          </Box>
+          <Box marginTop={1}>
+            <Hint>
+              API Base: {apiUrl}
+            </Hint>
+          </Box>
         </Box>
       );
     }
 
-    // 退出
+    // Exit
     if (page === 'exit') {
       exit();
-      return <Box width={VIEW_W} height={MID_H}><Text>退出...</Text></Box>;
+      return <Box width={VIEW_W} height={MID_H}><Text>Exiting...</Text></Box>;
     }
 
     return <Box width={VIEW_W} height={MID_H} />;
   }
 
-  // 退出逻辑
+  // Exit logic
   if (terminalSize.columns < 60 || terminalSize.rows < 15) {
     return (
       <Box flexDirection="column" padding={2}>
-        <Text color="red">终端窗口太小！ / Terminal too small!</Text>
-        <Text>当前 / Current: {terminalSize.columns}x{terminalSize.rows}</Text>
-        <Text>请调节窗口大小以继续... / Please resize to continue...</Text>
+        <Text color="red">Terminal too small!</Text>
+        <Text>Current: {terminalSize.columns}x{terminalSize.rows}</Text>
+        <Text>Please resize to continue...</Text>
       </Box>
     );
   }
 
-  // 根渲染：上-中-下三段
+  // Root Render
   return (
     <Box flexDirection="column" width={VIEW_W}>
-      {/* 顶部欢迎/Logo区 + 工具栏 */}
+      {/* Top Welcome / Logo Area + Toolbar */}
       <TopBar
         ready={configReady}
         page={page}
@@ -1130,9 +1202,7 @@ export const CliMenuManager: React.FC = () => {
         }
       />
 
-      {/* 中心业务区（固定高度，内部处理分页/滚动）
-          首页：无边框无 margin，WelcomeV2 直接撑满，避免 border 额外占行导致超出;
-          其它页面：single border + marginY */}
+      {/* Center Center Area */}
       {page === null ? (
         <Panel width={VIEW_W} height={MID_H} noBorder paddingX={0} paddingY={0} marginY={0}>
           {renderCenter()}
@@ -1143,7 +1213,7 @@ export const CliMenuManager: React.FC = () => {
         </Panel>
       )}
 
-      {/* 底部菜单与二级菜单 */}
+      {/* Bottom Menu & Secondary Menu */}
       <BottomBar
         width={VIEW_W}
         height={BOTTOM_H}

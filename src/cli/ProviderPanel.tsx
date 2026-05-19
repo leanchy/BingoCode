@@ -3,6 +3,7 @@ import { Box, Text, useApp } from 'ink';
 import SelectInput from 'ink-select-input';
 import TextInput from 'ink-text-input';
 import axios from 'axios';
+import { Panel, Title, Chip, Hint, StateDisplay, ScrollBar, safePadEnd } from '../manager/CliMenuUi.tsx';
 
 type ProviderField = {
   key: string;
@@ -56,10 +57,18 @@ type Stage =
 export const ProviderPanel: React.FC<{
   apiUrl: string;
   onBack?: () => void;
-}> = ({ apiUrl, onBack }) => {
+  height?: number;
+}> = ({ apiUrl, onBack, height = 10 }) => {
   const { exit } = useApp();
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  // Scrolling
+  const [listOffset, setListOffset] = useState(0);
+
+  // Calculated visible counts based on height
+  const MAX_VISIBLE = Math.max(3, height - 7);
+  const MAX_VISIBLE_MODELS = Math.max(3, height - 6);
 
   const [providers, setProviders] = useState<Provider[]>([]);
   const [currentId, setCurrentId] = useState<string | null>(null);
@@ -116,7 +125,7 @@ export const ProviderPanel: React.FC<{
       setProviders(list || []);
       setCurrentId(currentId);
     } catch (e: any) {
-      setErr(e?.message || '获取 Provider 列表失败');
+      setErr(e?.message || 'Failed to fetch provider list');
     } finally {
       setLoading(false);
     }
@@ -136,6 +145,19 @@ export const ProviderPanel: React.FC<{
     loadProviders();
     loadPresets();
   }, [loadProviders, loadPresets]);
+
+  // Key processing for Page Up/Down and Arrow keys in scrolling lists
+  useEffect(() => {
+    const handler = (buf: Buffer) => {
+      const s = buf.toString();
+      if (stage === 'add_select_preset' || stage === 'slot_select_model') {
+        if (s === 'j' || s === '\u001b[B') setListOffset(prev => prev + 1); // j or Down
+        if (s === 'k' || s === '\u001b[A') setListOffset(prev => Math.max(0, prev - 1)); // k or Up
+      }
+    };
+    process.stdin.on('data', handler);
+    return () => process.stdin.off('data', handler);
+  }, [stage]);
 
   // ESC 处理：子页返回列表；列表再触发 onBack（或退出）
   useEffect(() => {
@@ -160,6 +182,7 @@ export const ProviderPanel: React.FC<{
           setEditId(null);
           setEditName('');
           setEditKey('');
+          setListOffset(0);
         } else {
           onBack ? onBack() : exit();
         }
@@ -199,12 +222,12 @@ export const ProviderPanel: React.FC<{
       };
       if (extra && Object.keys(extra).length > 0) body.extra = extra;
       await axios.post(`${base}/api/providers`, body);
-      setOpMsg(`创建成功 -> ${name}`);
+      setOpMsg(`Success -> ${name}`);
       await loadProviders();
       setStage('list');
     } catch (e: any) {
-      setErr(e?.response?.data?.message || e?.message || '创建失败');
-      // 回到最后一个字段让用户看到错误，而不是触发再次提交
+      setErr(e?.response?.data?.message || e?.message || 'Create failed');
+      // Go back to the last field so user sees error instead of re-triggering submit
       setAddFieldIndex(Math.max(0, addFields.length - 1));
       setStage('add_input_fields');
     }
@@ -212,20 +235,20 @@ export const ProviderPanel: React.FC<{
 
   const doTest = async (id: string) => {
     setStage('testing');
-    setErr(null); setOpMsg('测试中...');
+    setErr(null); setOpMsg('Testing...');
     try {
       const res = await axios.post(`${base}/api/providers/${encodeURIComponent(id)}/test`);
       const result = res?.data?.result;
       const conn = result?.connectivity;
       if (conn?.success) {
-        setOpMsg(`连通性正常 -> ${id} (${conn.latencyMs}ms)`);
+        setOpMsg(`Connectivity OK -> ${id} (${conn.latencyMs}ms)`);
         setErr(null);
       } else {
-        setErr(`连通性异常: ${conn?.error || '未知错误'}`);
+        setErr(`Connectivity error: ${conn?.error || 'Unknown error'}`);
         setOpMsg(null);
       }
     } catch (e: any) {
-      setErr(e?.response?.data?.message || e?.message || `测试失败 -> ${id}`);
+      setErr(e?.response?.data?.message || e?.message || `Test failed -> ${id}`);
       setOpMsg(null);
     } finally {
       if (stage !== 'list') setStage('list');
@@ -241,11 +264,11 @@ export const ProviderPanel: React.FC<{
       if (name.trim()) updates.name = name.trim();
       if (apiKey.trim()) updates.apiKey = apiKey.trim();
       await axios.put(`${base}/api/providers/${encodeURIComponent(id)}`, updates);
-      setOpMsg(`已更新 Provider -> ${name.trim() || id}`);
+      setOpMsg(`Updated Provider -> ${name.trim() || id}`);
       await loadProviders();
       setStage('list');
     } catch (e: any) {
-      setErr(e?.response?.data?.message || e?.message || '编辑失败');
+      setErr(e?.response?.data?.message || e?.message || 'Edit failed');
       setStage('edit_input_key');
     }
   };
@@ -255,51 +278,51 @@ export const ProviderPanel: React.FC<{
     setErr(null); setOpMsg(null);
     try {
       await axios.delete(`${base}/api/providers/${encodeURIComponent(id)}`);
-      setOpMsg(`已删除 Provider -> ${id}`);
+      setOpMsg(`Deleted Provider -> ${id}`);
       await loadProviders();
       setStage('list');
     } catch (e: any) {
-      setErr(e?.response?.data?.message || e?.message || '删除失败');
+      setErr(e?.response?.data?.message || e?.message || 'Delete failed');
       setStage('list');
     }
   };
 
   const MAX_LIST = 5;
 
-  // 渲染块
+  // Render function for main list
   const renderList = () => {
     const visibleProviders = providers.slice(0, MAX_LIST);
     const overflow = providers.length - MAX_LIST;
     return (
-    <Box flexDirection="column">
-      <Text color="cyan">Provider 列表</Text>
-      {!providers.length && !loading && <Text>暂无 Provider</Text>}
-      {visibleProviders.map(p => {
-        const isCur = currentProvider && (currentProvider.id === p.id);
-        return (
-          <Text key={p.id} color={isCur ? 'green' : undefined} bold={isCur}>
-            {p.name || '-'}{isCur ? '  ← 当前' : ''}
-          </Text>
-        );
-      })}
-      {overflow > 0 && <Text dimColor>  ...还有 {overflow} 个</Text>}
-      {currentProvider && (
-        <Text dimColor>
-          当前 Provider: {currentProvider.name || currentProvider.id}
-        </Text>
-      )}
-      {loading && <Text color="yellow">加载中...</Text>}
+    <Box flexDirection="column" flexGrow={1}>
+      <Title color="cyan">Provider List</Title>
+      {!providers.length && !loading && <StateDisplay type="empty" message="No providers found" />}
+      <Box flexDirection="column" marginBottom={1}>
+        {visibleProviders.map(p => {
+          const isCur = currentProvider && (currentProvider.id === p.id);
+          return (
+            <Box key={p.id}>
+              <Text color={isCur ? 'green' : undefined} bold={isCur}>
+                {isCur ? '● ' : '  '}{p.name || '-'}
+                {isCur ? <Text dimColor> (Current)</Text> : ''}
+              </Text>
+            </Box>
+          );
+        })}
+        {overflow > 0 && <Text dimColor>  ...and {overflow} more</Text>}
+      </Box>
 
-      <Box marginTop={1} flexDirection="column">
+      {loading && <StateDisplay type="loading" message="Loading..." />}
+
+      <Box flexDirection="column" flexGrow={1}>
         <SelectInput
           items={[
-            { label: '新增 Provider', value: 'add' },
-            { label: '编辑 Provider（名称/API Key）', value: 'edit' },
-            { label: '配置槽位（main/haiku/sonnet/opus）', value: 'slots' },
-            { label: '连通性测试', value: 'test' },
-            { label: '删除 Provider', value: 'delete' },
-            { label: '刷新', value: 'refresh' },
-            { label: '返回主菜单（ESC）', value: 'back' },
+            { label: 'Add Provider', value: 'add' },
+            { label: 'Edit Provider (Name/Key)', value: 'edit' },
+            { label: 'Configure Slots', value: 'slots' },
+            { label: 'Connectivity Test', value: 'test' },
+            { label: 'Delete Provider', value: 'delete' },
+            { label: 'Refresh', value: 'refresh' },
           ]}
           onSelect={item => {
             switch (item.value) {
@@ -308,12 +331,14 @@ export const ProviderPanel: React.FC<{
                 setAddFields([]);
                 setAddFieldValues({});
                 setAddFieldIndex(0);
+                setListOffset(0);
                 setStage('add_select_preset');
                 break;
               case 'edit':
                 setEditId(null);
                 setEditName('');
                 setEditKey('');
+                setListOffset(0);
                 setStage('edit_select');
                 break;
               case 'slots':
@@ -321,34 +346,26 @@ export const ProviderPanel: React.FC<{
                   .then(r => setSlotTable(r.data as Record<string, SlotEntry>))
                   .catch(() => {});
                 setStage('slot_config');
+                setListOffset(0);
                 break;
               case 'test':
                 setStage('test_select');
+                setListOffset(0);
                 break;
               case 'delete':
                 setStage('delete_select');
+                setListOffset(0);
                 break;
               case 'refresh':
                 loadProviders();
                 break;
-              case 'back':
-                onBack ? onBack() : null;
-                break;
             }
           }}
         />
-        {err && (
-          <Box marginTop={1}>
-            <Text color="red">{err}</Text>
-          </Box>
-        )}
-        {opMsg && (
-          <Box marginTop={1}>
-            <Text color="green">{opMsg}</Text>
-          </Box>
-        )}
-        <Text dimColor>提示：ESC 返回。↑↓/回车 选择操作</Text>
+        {err && <StateDisplay type="error" message={err} />}
+        {opMsg && <Box marginTop={1}><Text color="green">{opMsg}</Text></Box>}
       </Box>
+      <Hint>ESC: Back · ↑↓/Enter: Select Action</Hint>
     </Box>
     );
   };
@@ -362,40 +379,88 @@ export const ProviderPanel: React.FC<{
         : `${pr.label || pr.name || pr.id}`,
       value: pr.id
     }));
+
+    // Add Custom option only if not already in presets
+    const finalItems = [
+      ...(presets.some(p => p.id === 'custom') ? [] : [{ label: 'Custom (OpenAI Compatible)', value: 'custom' }]),
+      ...items
+    ];
+
     if (!items.length) {
       return (
-        <Box flexDirection="column">
-          <Text color="yellow">未获取到预设，请先确保主服务已启动。</Text>
+        <Box flexDirection="column" flexGrow={1}>
+          <Title color="cyan">Select Preset</Title>
           <SelectInput
-            items={[{ label: '← 返回', value: 'back' }]}
-            onSelect={() => setStage('list')}
+            items={finalItems}
+            onSelect={it => {
+              if (it.value === 'custom') {
+                const fields: ProviderField[] = [
+                  { key: 'name', label: 'Provider Nickname', required: true, placeholder: 'My Custom API' },
+                  { key: 'baseUrl', label: 'Base URL', required: true, placeholder: 'https://api.example.com/v1' },
+                  { key: 'apiKey', label: 'API Key', required: true, secret: true },
+                ];
+                setSelectedPresetId('custom');
+                setAddFields(fields);
+                setAddFieldValues({});
+                setAddFieldIndex(0);
+                setListOffset(0);
+                setStage('add_input_fields');
+              } else {
+                setStage('list');
+              }
+            }}
           />
+          {!items.length && <Hint dimColor>No presets found from server, only Custom available.</Hint>}
         </Box>
       );
     }
+
+    // const MAX_VISIBLE = 8;
+    const start = Math.min(listOffset, Math.max(0, finalItems.length - MAX_VISIBLE));
+    const sliced = finalItems.slice(start, start + MAX_VISIBLE);
+
     return (
-      <Box flexDirection="column">
-        <Text>选择预设：</Text>
-        <SelectInput
-          items={items}
-          onSelect={it => {
-            const preset = presets.find(p => p.id === (it.value as string));
-            // 从 preset.fields 获取字段列表；若为空则用默认最小集
-            const fields: ProviderField[] =
-              preset?.fields && preset.fields.length > 0
-                ? preset.fields
-                : [
-                    { key: 'name', label: 'Provider 昵称', required: true },
+      <Box flexDirection="column" flexGrow={1}>
+        <Title color="cyan">Select Preset</Title>
+        <Box flexDirection="row" flexGrow={1}>
+          <Box flexDirection="column" flexGrow={1}>
+            <SelectInput
+              items={sliced}
+              onSelect={it => {
+                if (it.value === 'custom') {
+                  const fields: ProviderField[] = [
+                    { key: 'name', label: 'Provider Nickname', required: true, placeholder: 'My Custom API' },
+                    { key: 'baseUrl', label: 'Base URL', required: true, placeholder: 'https://api.example.com/v1' },
                     { key: 'apiKey', label: 'API Key', required: true, secret: true },
                   ];
-            setSelectedPresetId(it.value as string);
-            setAddFields(fields);
-            setAddFieldValues({});
-            setAddFieldIndex(0);
-            setStage('add_input_fields');
-          }}
-        />
-        <Text dimColor>ESC 返回</Text>
+                  setSelectedPresetId('custom');
+                  setAddFields(fields);
+                  setAddFieldValues({});
+                  setAddFieldIndex(0);
+                  setListOffset(0);
+                  setStage('add_input_fields');
+                } else {
+                  const preset = presets.find(p => p.id === (it.value as string));
+                  const fields: ProviderField[] =
+                    preset?.fields && preset.fields.length > 0
+                      ? preset.fields
+                      : [
+                          { key: 'name', label: 'Provider Nickname', required: true },
+                          { key: 'apiKey', label: 'API Key', required: true, secret: true },
+                        ];
+                  setSelectedPresetId(it.value as string);
+                  setAddFields(fields);
+                  setAddFieldValues({});
+                  setAddFieldIndex(0);
+                  setListOffset(0);
+                  setStage('add_input_fields');
+                }
+              }}
+            />
+          </Box>
+          <ScrollBar total={finalItems.length} offset={start} height={MAX_VISIBLE} />
+        </Box>
+        <Hint>↑↓: Select · j Next Page · k Prev Page · ESC: Back</Hint>
       </Box>
     );
   }
@@ -403,18 +468,15 @@ export const ProviderPanel: React.FC<{
   if (stage === 'add_input_fields') {
     const field = addFields[addFieldIndex];
     if (!field) {
-      // 防御性分支：所有字段已填完但还没触发提交（一般不应走到这里）
-      return <Text color="yellow">创建中...</Text>;
+      return <StateDisplay type="loading" message="Creating..." />;
     }
 
     const currentVal = addFieldValues[field.key] ?? field.default ?? '';
 
     const handleSubmit = (submittedVal: string) => {
-      // ink-text-input passes the current value to onSubmit
       const val = submittedVal;
-      if (field.required && !val.trim()) return; // 必填不允许空
+      if (field.required && !val.trim()) return;
 
-      // 确保最新值已写入
       const merged = { ...addFieldValues, [field.key]: val };
 
       const nextIndex = addFieldIndex + 1;
@@ -422,7 +484,6 @@ export const ProviderPanel: React.FC<{
         setAddFieldValues(merged);
         setAddFieldIndex(nextIndex);
       } else {
-        // 最后一个字段提交，触发创建
         const name = merged['name'] || '';
         const apiKey = merged['apiKey'] || '';
         const baseUrl = merged['baseUrl'] || '';
@@ -436,29 +497,35 @@ export const ProviderPanel: React.FC<{
     };
 
     return (
-      <Box flexDirection="column">
-        <Text color="cyan">
-          新增 Provider — 字段 {addFieldIndex + 1}/{addFields.length}
-        </Text>
-        <Text>
-          {field.label}{field.required ? <Text color="red"> *</Text> : ''}
-          {field.placeholder ? <Text dimColor>  ({field.placeholder})</Text> : ''}：
-        </Text>
+      <Box flexDirection="column" flexGrow={1}>
+        <Title color="cyan">
+          Add Provider — Field {addFieldIndex + 1}/{addFields.length}
+        </Title>
+        <Box marginBottom={1} flexDirection="row">
+          <Box width={20}>
+            <Text>
+              {field.label}{field.required ? <Text color="red"> *</Text> : ''}
+            </Text>
+          </Box>
+          <Box flexGrow={1}>
+            {field.placeholder ? <Text dimColor>({field.placeholder})</Text> : <Text />}
+          </Box>
+        </Box>
         <TextInput
           value={currentVal}
           onChange={v => setAddFieldValues(prev => ({ ...prev, [field.key]: v }))}
-          // @ts-ignore - ink-text-input supports mask prop
+          // @ts-ignore
           mask={field.secret ? '*' : undefined}
           onSubmit={handleSubmit}
         />
-        {err && <Text color="red">{err}</Text>}
-        <Text dimColor>回车继续，ESC 返回列表</Text>
+        {err && <StateDisplay type="error" message={err} />}
+        <Hint>Enter: Continue · ESC: Back to List</Hint>
       </Box>
     );
   }
 
   if (stage === 'creating') {
-    return <Text color="yellow">创建中...</Text>;
+    return <StateDisplay type="loading" message="Creating..." />;
   }
 
   if (stage === 'test_select') {
@@ -467,20 +534,20 @@ export const ProviderPanel: React.FC<{
       value: p.id
     }));
     return (
-      <Box flexDirection="column">
-        <Text>选择要测试的 Provider：</Text>
+      <Box flexDirection="column" flexGrow={1}>
+        <Title color="cyan">Select Provider to Test</Title>
         <SelectInput
           items={items}
           onSelect={it => doTest(it.value as string)}
         />
-        {err && <Text color="red">{err}</Text>}
-        <Text dimColor>ESC 返回</Text>
+        {err && <StateDisplay type="error" message={err} />}
+        <Hint>ESC: Back</Hint>
       </Box>
     );
   }
 
   if (stage === 'testing') {
-    return <Text color="yellow">测试中...</Text>;
+    return <StateDisplay type="loading" message="Testing..." />;
   }
 
   if (stage === 'delete_select') {
@@ -489,8 +556,8 @@ export const ProviderPanel: React.FC<{
       value: p.id
     }));
     return (
-      <Box flexDirection="column">
-        <Text color="red">选择要删除的 Provider：</Text>
+      <Box flexDirection="column" flexGrow={1}>
+        <Title color="red">Select Provider to Delete</Title>
         <SelectInput
           items={items}
           onSelect={it => {
@@ -498,7 +565,7 @@ export const ProviderPanel: React.FC<{
             setStage('delete_confirm');
           }}
         />
-        <Text dimColor>ESC 返回</Text>
+        <Hint>ESC: Back</Hint>
       </Box>
     );
   }
@@ -506,12 +573,12 @@ export const ProviderPanel: React.FC<{
   if (stage === 'delete_confirm') {
     if (!selectedId) { setStage('list'); return null; }
     return (
-      <Box flexDirection="column">
-        <Text color="red">确认删除 Provider：{selectedId} ？</Text>
+      <Box flexDirection="column" flexGrow={1}>
+        <Title color="red">Confirm Delete: {selectedId}?</Title>
         <SelectInput
           items={[
-            { label: '是，删除', value: 'yes' },
-            { label: '否，返回', value: 'no' }
+            { label: 'Yes, Delete', value: 'yes' },
+            { label: 'No, Back', value: 'no' }
           ]}
           onSelect={it => {
             if (it.value === 'no') {
@@ -521,32 +588,32 @@ export const ProviderPanel: React.FC<{
             }
           }}
         />
-        {err && <Text color="red">{err}</Text>}
-        <Text dimColor>ESC 返回</Text>
+        {err && <StateDisplay type="error" message={err} />}
+        <Hint>ESC: Back</Hint>
       </Box>
     );
   }
 
   if (stage === 'removing') {
-    return <Text color="yellow">删除中...</Text>;
+    return <StateDisplay type="loading" message="Deleting..." />;
   }
 
   if (stage === 'edit_select') {
     const items = providers.map(p => ({
-      label: `${p.name || p.id}${(currentId === p.id || p.isCurrent) ? '  ← 当前' : ''}`,
+      label: `${p.name || p.id}${(currentId === p.id || p.isCurrent) ? '  ← Current' : ''}`,
       value: p.id,
     }));
     if (!items.length) {
       return (
-        <Box flexDirection="column">
-          <Text color="yellow">暂无 Provider 可编辑。</Text>
-          <SelectInput items={[{ label: '← 返回', value: 'back' }]} onSelect={() => setStage('list')} />
+        <Box flexDirection="column" flexGrow={1}>
+          <StateDisplay type="empty" message="No providers available to edit." />
+          <SelectInput items={[{ label: '← Back', value: 'back' }]} onSelect={() => setStage('list')} />
         </Box>
       );
     }
     return (
-      <Box flexDirection="column">
-        <Text>选择要编辑的 Provider：</Text>
+      <Box flexDirection="column" flexGrow={1}>
+        <Title color="cyan">Select Provider to Edit</Title>
         <SelectInput
           items={items}
           onSelect={it => {
@@ -557,29 +624,31 @@ export const ProviderPanel: React.FC<{
             setStage('edit_input_name');
           }}
         />
-        <Text dimColor>ESC 返回</Text>
+        <Hint>ESC: Back</Hint>
       </Box>
     );
   }
 
   if (stage === 'edit_input_name') {
     return (
-      <Box flexDirection="column">
-        <Text>编辑名称（当前：<Text color="cyan">{editName}</Text>，回车保留不变）：</Text>
+      <Box flexDirection="column" flexGrow={1}>
+        <Title color="cyan">Edit Name</Title>
+        <Text>Current: <Text color="cyan">{editName}</Text> (Enter to keep):</Text>
         <TextInput
           value={editName}
           onChange={setEditName}
           onSubmit={() => setStage('edit_input_key')}
         />
-        <Text dimColor>回车继续，ESC 返回</Text>
+        <Hint>Enter: Continue · ESC: Back</Hint>
       </Box>
     );
   }
 
   if (stage === 'edit_input_key') {
     return (
-      <Box flexDirection="column">
-        <Text>输入新 API Key（留空则不修改）：</Text>
+      <Box flexDirection="column" flexGrow={1}>
+        <Title color="cyan">Edit API Key</Title>
+        <Text>Enter new API Key (Leave empty to keep current):</Text>
         <TextInput
           value={editKey}
           onChange={setEditKey}
@@ -590,49 +659,48 @@ export const ProviderPanel: React.FC<{
             doEdit(editId, editName, editKey);
           }}
         />
-        {err && <Text color="red">{err}</Text>}
-        <Text dimColor>回车保存，ESC 返回</Text>
+        {err && <StateDisplay type="error" message={err} />}
+        <Hint>Enter: Save · ESC: Back</Hint>
       </Box>
     );
   }
 
   if (stage === 'editing') {
-    return <Text color="yellow">保存中...</Text>;
+    return <StateDisplay type="loading" message="Saving..." />;
   }
 
   if (stage === 'slot_config') {
     const SLOTS = ['main', 'haiku', 'sonnet', 'opus'] as const;
     const SLOT_DESCS: Record<string, string> = {
-      main:   '主力模型，复杂推理、长上下文、代码生成等高要求任务',
-      haiku:  '快速轻量，简单问答、自动补全、低延迟响应',
-      sonnet: '均衡模型，兼顾质量与速度，适合日常对话',
-      opus:   '最强模型，深度推理与复杂分析（调用量通常最少）',
+      main:   'Main model for complex reasoning and long context.',
+      haiku:  'Fast & light for simple Q&A and low latency.',
+      sonnet: 'Balanced quality & speed for daily tasks.',
+      opus:   'Strongest reasoning for deep analysis.',
     };
     const items = SLOTS.map(s => {
       const entry = slotTable[s];
       const providerName = entry
         ? (providers.find(p => p.id === entry.providerId)?.name || entry.providerId)
         : null;
-      const modelDisplayName = entry?.label || entry?.modelId || '未配置';
-      const status = entry ? `${providerName} / ${modelDisplayName}` : '未配置';
-      const label = `[${s}]  ${status}  — ${SLOT_DESCS[s]}`;
+      const modelDisplayName = entry?.label || entry?.modelId || 'Unconfigured';
+      const status = entry ? `${providerName} / ${modelDisplayName}` : 'Unconfigured';
+      const label = `[${s}] ${safePadEnd(status, 30)} — ${SLOT_DESCS[s]}`;
       return { label, value: s };
     });
     return (
-      <Box flexDirection="column">
-        <Text color="cyan">配置槽位（选中槽位后选择模型）</Text>
-        {err && <Text color="red">{err}</Text>}
-        {opMsg && <Text color="green">{opMsg}</Text>}
+      <Box flexDirection="column" flexGrow={1}>
+        <Title color="cyan">Configure Model Slots</Title>
+        {err && <StateDisplay type="error" message={err} />}
+        {opMsg && <Box marginBottom={1}><Text color="green">{opMsg}</Text></Box>}
         <SelectInput
-          items={[...items, { label: '← 返回主菜单', value: 'back' }]}
+          items={[...items, { label: '← Back to Menu', value: 'back' }]}
           onSelect={it => {
             if (it.value === 'back') { setStage('list'); setErr(null); return; }
             const slotName = it.value as string;
             setCurrentSlotName(slotName);
             setErr(null);
-            setSlotLoadingMsg(`正在拉取模型列表...`);
+            setSlotLoadingMsg(`Fetching model list...`);
             setStage('slot_loading');
-            // Fetch model lists from each provider's API endpoint
             Promise.all(
               providers.map(p =>
                 axios.get(`${base}/api/providers/${encodeURIComponent(p.id)}/models`)
@@ -647,27 +715,27 @@ export const ProviderPanel: React.FC<{
               const map: Record<string, string[]> = {};
               results.forEach(r => { map[r.id] = r.models; });
               setSlotProviderModels(map);
-              // Check if any models available
               const hasAny = results.some(r => r.models.length > 0);
               if (!hasAny) {
-                setErr('所有 Provider 均未返回可用模型，请检查 API Key 和网络连接');
+                setErr('No models returned from any provider. Check API keys.');
                 setStage('slot_config');
               } else {
+                setListOffset(0);
                 setStage('slot_select_model');
               }
             });
           }}
         />
-        <Text dimColor>ESC 返回</Text>
+        <Hint>ESC: Back</Hint>
       </Box>
     );
   }
 
   if (stage === 'slot_loading') {
     return (
-      <Box flexDirection="column">
-        <Text color="yellow">{slotLoadingMsg || '正在拉取模型列表...'}</Text>
-        <Text dimColor>ESC 取消</Text>
+      <Box flexDirection="column" flexGrow={1}>
+        <StateDisplay type="loading" message={slotLoadingMsg || 'Fetching models...'} />
+        <Hint>ESC: Cancel</Hint>
       </Box>
     );
   }
@@ -683,48 +751,58 @@ export const ProviderPanel: React.FC<{
 
     if (items.length === 0) {
       return (
-        <Box flexDirection="column">
-          <Text color="red">没有可用的模型（所有 Provider 均未返回模型，请检查 API Key 和网络）</Text>
+        <Box flexDirection="column" flexGrow={1}>
+          <StateDisplay type="error" message="No available models found." />
           <SelectInput
-            items={[{ label: '← 返回', value: 'back' }]}
+            items={[{ label: '← Back', value: 'back' }]}
             onSelect={() => setStage('slot_config')}
           />
         </Box>
       );
     }
 
+    // const MAX_VISIBLE_MODELS = 8;
+    const start = Math.min(listOffset, Math.max(0, items.length - MAX_VISIBLE_MODELS));
+    const sliced = items.slice(start, start + MAX_VISIBLE_MODELS);
+
     return (
-      <Box flexDirection="column">
-        <Text color="cyan">配置槽位 [{currentSlotName}] — 选择模型</Text>
-        {err && <Text color="red">{err}</Text>}
-        <SelectInput
-          items={items}
-          onSelect={it => {
-            const val = it.value as string;
-            if (val.startsWith('__header__')) return;
-            const sepIdx = val.indexOf('::');
-            const providerId = val.slice(0, sepIdx);
-            const modelId = val.slice(sepIdx + 2);
-            setTempSlotProviderId(providerId);
-            setTempSlotModelId(modelId);
-            setSlotLabelInput(modelId); // 默认建议使用模型名作为 Label
-            setStage('slot_input_label');
-          }}
-        />
-        <Text dimColor>↑↓ 选择模型，回车确认，ESC 返回</Text>
+      <Box flexDirection="column" flexGrow={1}>
+        <Title color="cyan">Configure Slot [{currentSlotName}] — Select Model</Title>
+        {err && <StateDisplay type="error" message={err} />}
+
+        <Box flexDirection="row" flexGrow={1}>
+          <Box flexDirection="column" flexGrow={1}>
+            <SelectInput
+              items={sliced}
+              onSelect={it => {
+                const val = it.value as string;
+                if (val.startsWith('__header__')) return;
+                const sepIdx = val.indexOf('::');
+                const providerId = val.slice(0, sepIdx);
+                const modelId = val.slice(sepIdx + 2);
+                setTempSlotProviderId(providerId);
+                setTempSlotModelId(modelId);
+                setSlotLabelInput(modelId);
+                setStage('slot_input_label');
+              }}
+            />
+          </Box>
+          <ScrollBar total={items.length} offset={start} height={MAX_VISIBLE_MODELS} />
+        </Box>
+        <Hint>↑↓: Select · j Next Page · k Prev Page · ESC: Back</Hint>
       </Box>
     );
   }
 
   if (stage === 'slot_input_label') {
     return (
-      <Box flexDirection="column">
-        <Text color="cyan">配置槽位 [{currentSlotName}] — 设置显示名称</Text>
+      <Box flexDirection="column" flexGrow={1}>
+        <Title color="cyan">Configure Slot [{currentSlotName}] — Set Display Name</Title>
         <Text>
-          模型：{providers.find(p => p.id === tempSlotProviderId)?.name || tempSlotProviderId} / {tempSlotModelId}
+          Model: {providers.find(p => p.id === tempSlotProviderId)?.name || tempSlotProviderId} / {tempSlotModelId}
         </Text>
         <Box marginTop={1}>
-          <Text>显示名称 (Label)：</Text>
+          <Text>Display Name (Label): </Text>
           <TextInput
             value={slotLabelInput}
             onChange={setSlotLabelInput}
@@ -740,18 +818,19 @@ export const ProviderPanel: React.FC<{
                   ...prev,
                   [currentSlotName]: { providerId: tempSlotProviderId, modelId: tempSlotModelId, label }
                 }));
-                setOpMsg(`已配置 [${currentSlotName}] -> ${label}`);
+                setOpMsg(`Configured [${currentSlotName}] -> ${label}`);
                 setErr(null);
+                setListOffset(0);
                 setStage('slot_config');
               })
               .catch(e => {
-                setErr((e as any)?.response?.data?.message || (e as any)?.message || '保存失败');
+                setErr((e as any)?.response?.data?.message || (e as any)?.message || 'Save failed');
                 setStage('slot_config');
               });
             }}
           />
         </Box>
-        <Text dimColor>回车保存组件名称（显示在 Claude UI），ESC 返回模型选择</Text>
+        <Hint>Enter: Save (Display name in UI) · ESC: Back to Models</Hint>
       </Box>
     );
   }

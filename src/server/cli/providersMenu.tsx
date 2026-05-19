@@ -31,7 +31,7 @@ const FIXED_APIFMT = 'openai_chat';
 const ProvidersMenu: React.FC = () => {
   const { exit } = useApp();
   const [modelSelectIdx, setModelSelectIdx] = useState(0);
-  const [addStep, setAddStep] = useState(0); // 0:选模型, 1:填key
+  const [addStep, setAddStep] = useState(0); // 0: Select Model, 1: Fill key
   const [inputKey, setInputKey] = useState('');
   const [addError, setAddError] = useState('');
   const [mode, setMode] = useState<UiMode>('list');
@@ -40,7 +40,7 @@ const ProvidersMenu: React.FC = () => {
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [editKey, setEditKey] = useState('');
   const [removeConfirm, setRemoveConfirm] = useState(false);
-  // 新增
+  // Added
   const [msg, setMsg] = useState<string>('');
   const [detail, setDetail] = useState<SavedProvider | null>(null);
   const [presets, setPresets] = useState<any[]>([]);
@@ -57,7 +57,7 @@ const ProvidersMenu: React.FC = () => {
     if (mode !== 'add') { setAddStep(0); setInputKey(''); setAddError(''); setModelSelectIdx(0); }
   }, [mode]);
 
-  // 主界面 LIST 模式
+  // Main UI LIST mode
   useInput((inputKey, key) => {
     if (mode === 'list') {
       if (key.downArrow) setSelectedIdx(i => Math.min(list.length - 1, i + 1));
@@ -88,15 +88,15 @@ const ProvidersMenu: React.FC = () => {
     }
   }, { isActive: mode === 'list' || mode === 'removeConfirm' });
 
-  // ADD模式交互
+  // ADD mode interaction
   useInput((inputKey, key) => {
     if (mode !== 'add') return;
-    // 全局返回
+    // Global Back
     if (inputKey === 'q' || key.escape) {
       setMode('list'); setAddError(''); setInputKey(''); setAddStep(0);
       return;
     }
-    // 步骤0: 主模型选择
+    // Step 0: Main Model Selection
     if (addStep === 0) {
       if (key.downArrow) setModelSelectIdx(idx => Math.min(MODEL_OPTIONS.length - 1, idx + 1));
       else if (key.upArrow) setModelSelectIdx(idx => Math.max(0, idx - 1));
@@ -104,16 +104,16 @@ const ProvidersMenu: React.FC = () => {
     }
   }, { isActive: mode === 'add' });
 
-  // 新增表单
+  // Add Form
   const addSubmit = async (keyInput: string) => {
     const selectedModel = MODEL_OPTIONS[modelSelectIdx];
     const presetId = selectedModel.replace(/[^a-zA-Z0-9]/g, '') + '-preset';
     const name = `${selectedModel} Provider`;
-    if (!keyInput.trim()) { setAddError('API Key 不能为空'); return; }
+    if (!keyInput.trim()) { setAddError('API Key cannot be empty'); return; }
     const exists = (await ProviderManager.listProviders()).some(p => p.id === presetId);
-    if (exists) { setAddError('该模型已添加过，如要更换Key请在列表编辑。'); return; }
+    if (exists) { setAddError('This model has already been added. Edit key in the list instead.'); return; }
     setAddError('');
-    // 支持预设覆盖
+    // Support preset override
     const overrideBase = (global as any).__PM_BASEURL_OVERRIDE__ || FIXED_BASEURL;
     const overrideFmt = (global as any).__PM_APIFMT_OVERRIDE__ || FIXED_APIFMT;
     await ProviderManager.addProvider({
@@ -132,28 +132,28 @@ const ProvidersMenu: React.FC = () => {
   // UI
   return (
     <Box flexDirection="column" margin={1}>
-      <Text bold color="cyan">Provider 管理器 ↑↓切换 s激活 n新增 e编辑Key d删除 q退出</Text>
-      <Text color="cyan">APIKey获取链接：https://mlaas.games.com/auth/token</Text>
+      <Text bold color="cyan">Provider Manager: ↑↓ move · s active · n new · e edit Key · d del · q quit</Text>
+      <Text color="cyan">Get API Key: https://mlaas.games.com/auth/token</Text>
       <Newline />
-      {/* 列表 */}
+      {/* List */}
       {mode === 'list' && (list.length === 0 ?
-        <Text color="gray">无 provider，请按 n 新建…</Text> :
+        <Text color="gray">No providers found. Press 'n' to add...</Text> :
         list.map((p, idx) => (
           <Box key={p.id}>
             <Text>
               {selectedIdx === idx
                 ? chalk.bgHex('#ffc300').black(`> ${p.name.padEnd(18)} ${p.baseUrl}`)
                 : `  ${p.name.padEnd(18)} ${p.baseUrl}`}
-              {activeId === p.id ? chalk.green(' [当前]') : ''}
+              {activeId === p.id ? chalk.green(' [Current]') : ''}
             </Text>
           </Box>
         ))
       )}
 
-      {/* 新增 */}
+      {/* Add */}
       {mode === 'add' && (
         <Box flexDirection="column">
-          <Text>选择模型与输入API Key：</Text>
+          <Text>Select Model and Input API Key:</Text>
           {addStep === 0
             ? <>
                 {MODEL_OPTIONS.map((m, idx) => (
@@ -161,27 +161,27 @@ const ProvidersMenu: React.FC = () => {
                     {idx === modelSelectIdx ? '> ' : '  '}{m}
                   </Text>
                 ))}
-                <Text color="gray">↑↓选择，回车下一步，q返回</Text>
+                <Text color="gray">↑↓ select, Enter next, q back</Text>
               </>
             : <>
-                <Text>已选模型：{MODEL_OPTIONS[modelSelectIdx]}</Text>
+                <Text>Selected Model: {MODEL_OPTIONS[modelSelectIdx]}</Text>
                 <TextInput
                   value={inputKey}
                   onChange={setInputKey}
                   onSubmit={addSubmit}
-                  placeholder="请输入API Key"
+                  placeholder="Please enter API Key"
                 />
-                <Text color="gray">输入后回车提交，q返回</Text>
+                <Text color="gray">Enter submit, q back</Text>
               </>
           }
           {addError && <Text color="red">{addError}</Text>}
         </Box>
       )}
 
-      {/* 编辑key */}
+      {/* Edit key */}
       {mode === 'editKey' && (
         <Box flexDirection="column">
-          <Text>输入新的 API Key：</Text>
+          <Text>Enter New API Key:</Text>
           <TextInput
             value={editKey}
             onChange={setEditKey}
@@ -193,38 +193,38 @@ const ProvidersMenu: React.FC = () => {
                 setMode('list'); setEditKey(''); refresh();
               }
             }}
-            placeholder="新API Key"
+            placeholder="New API Key"
           />
-          <Text>回车确认，q取消</Text>
+          <Text>Enter confirm, q cancel</Text>
         </Box>
       )}
 
-      {/* 删除 */}
+      {/* Remove */}
       {mode === 'removeConfirm' && (
         <Box flexDirection="column">
           <Text color="red">
-            确认删除 "{list[selectedIdx]?.name}" provider？ (y确认 / q取消)
+            Confirm delete "{list[selectedIdx]?.name}" provider? (y confirm / q cancel)
           </Text>
         </Box>
       )}
 
-      {/* Provider 详情模式 */}
+      {/* Provider detail mode */}
       {mode === 'detail' && detail && (
         <Box flexDirection="column">
-          <Text color="cyan">Provider 详情</Text>
-          <Text>名称: {detail.name}</Text>
+          <Text color="cyan">Provider Details</Text>
+          <Text>Name: {detail.name}</Text>
           <Text>BaseURL: {detail.baseUrl}</Text>
-          <Text>API格式: {detail.apiFormat}</Text>
-          <Text>主模型: {detail.models?.main || '-'}</Text>
-          <Text>备注: {detail.notes || '-'}</Text>
+          <Text>API Format: {detail.apiFormat}</Text>
+          <Text>Main Model: {detail.models?.main || '-'}</Text>
+          <Text>Notes: {detail.notes || '-'}</Text>
           {msg && <Text color="green">{msg}</Text>}
           <SelectInput
             items={[
-              { label: activeId === detail.id ? '✓ 已是当前' : '设为当前', value: '__set' },
-              { label: '测试连通性', value: '__test' },
-              { label: '编辑 Key', value: '__editKey' },
-              { label: '删除', value: '__delete' },
-              { label: '← 返回列表', value: '__back' },
+              { label: activeId === detail.id ? '✓ Already Active' : 'Set as Active', value: '__set' },
+              { label: 'Test Connectivity', value: '__test' },
+              { label: 'Edit Key', value: '__editKey' },
+              { label: 'Delete', value: '__delete' },
+              { label: '← Back to List', value: '__back' },
             ]}
             onSelect={async it => {
               setMsg('');
@@ -234,28 +234,28 @@ const ProvidersMenu: React.FC = () => {
               if (it.value === '__set' && activeId !== detail.id) {
                 await ProviderManager.setCurrentProvider(detail.id);
                 setActiveId(detail.id);
-                setMsg('已设为当前');
+                setMsg('Set as active');
                 await refresh();
                 return;
               }
               if (it.value === '__test') {
                 const r = await ProviderManager.testProvider(detail);
-                setMsg(r.ok ? `连通性正常，延迟 ${r.latencyMs || 0}ms` : `失败：${r.message || '未知错误'}`);
+                setMsg(r.ok ? `Connectivity OK, latency ${r.latencyMs || 0}ms` : `Failed: ${r.message || 'Unknown error'}`);
               }
             }}
           />
         </Box>
       )}
 
-      {/* 预设新增 Provider */}
+      {/* Apply Preset Add Provider */}
       {mode === 'applyPreset' && (
         <Box flexDirection="column">
-          <Text color="cyan">从预设新增 Provider</Text>
+          <Text color="cyan">Add Provider from Preset</Text>
           {!presets.length ? (
-            <Text color="gray">暂无可用预设，按 q 返回。</Text>
+            <Text color="gray">No presets available. Press 'q' to back.</Text>
           ) : (
             <>
-              <Text>选择一个预设：</Text>
+              <Text>Select a Preset:</Text>
               <SelectInput
                 items={presets.map((p: any) => ({ label: `${p.name || p.id} ${p.baseUrl || ''}`, value: p.id }))}
                 onSelect={async it => {
@@ -269,10 +269,10 @@ const ProvidersMenu: React.FC = () => {
                   (global as any).__PM_BASEURL_OVERRIDE__ = presetBase;
                   (global as any).__PM_APIFMT_OVERRIDE__ = presetFmt;
                   setMode('add');
-                  setAddStep(1); // 直接跳到 Key 输入
+                  setAddStep(1); // Jump to Key input
                 }}
               />
-              <Text color="gray">回车选择预设，q 返回</Text>
+              <Text color="gray">Enter select, q back</Text>
             </>
           )}
         </Box>
