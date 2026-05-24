@@ -135,6 +135,10 @@ type State = {
   // (useScheduledTasks). Set by cronScheduler.start() when the JSON has
   // entries, or by CronCreateTool. Not persisted.
   scheduledTasksEnabled: boolean
+  // Session-only goal condition for /goal command. Null when no active goal.
+  goalCondition: string | null
+  goalIterationCount: number
+  goalMaxIterations: number
   // Session-only cron tasks created via CronCreate with durable: false.
   // Fire on schedule like file-backed tasks but are never written to
   // .claude/scheduled_tasks.json — they die with the process. Typed via
@@ -357,6 +361,10 @@ function getInitialState(): State {
     sessionBypassPermissionsMode: false,
     // Scheduled tasks disabled until flag or dialog enables them
     scheduledTasksEnabled: false,
+    // Goal condition for /goal command (null = no active goal)
+    goalCondition: null,
+    goalIterationCount: 0,
+    goalMaxIterations: 20,
     sessionCronTasks: [],
     sessionCreatedTeams: new Set(),
     // Session-only trust flag (not persisted to disk)
@@ -1770,5 +1778,30 @@ export function getPromptId(): string | null {
 
 export function setPromptId(id: string | null): void {
   STATE.promptId = id
+}
+
+// ============================================================================
+// /goal session state accessors
+// ============================================================================
+
+export function getGoalCondition(): string | null {
+  return STATE.goalCondition
+}
+
+export function setGoalCondition(condition: string | null): void {
+  STATE.goalCondition = condition
+  STATE.goalIterationCount = 0
+}
+
+export function getGoalIterationCount(): number {
+  return STATE.goalIterationCount
+}
+
+export function incrementGoalIterationCount(): void {
+  STATE.goalIterationCount++
+}
+
+export function getGoalMaxIterations(): number {
+  return STATE.goalMaxIterations
 }
 

@@ -1,6 +1,6 @@
 {
   "name": "bingocode",
-  "version": "1.1.100",
+  "version": "1.1.135",
   "type": "module",
   "bin": {
     "claude": "bin/claude-win.cjs",
@@ -14,7 +14,8 @@
     "bingocode": "bun run ./bin/bingocode-win.cjs",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
-    "docs:preview": "vitepress preview docs"
+    "docs:preview": "vitepress preview docs",
+    "postinstall": "node scripts/install-skills.cjs"
   },
   "files": [
     "bin/",

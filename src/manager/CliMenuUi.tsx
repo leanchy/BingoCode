@@ -256,23 +256,20 @@ export const ChipRow: React.FC<{ children: React.ReactNode }> = memo(({ children
   </Box>
 ));
 
-// TopBar (logo + toolbar horizontal arrangement, with ready state and placeholder)
+// TopBar (full-width toolbar, no separate logo slot)
 export const TopBar: React.FC<{
   ready: boolean;
   page: string | null;
   width?: number;
   height?: number;
-  homeLogo: React.ReactNode;
-  compactLogo: React.ReactNode;
+  homeLogo?: React.ReactNode;
+  compactLogo?: React.ReactNode;
   toolbar?: React.ReactNode;
   ip?: string;
-}> = memo(({ ready, page, width = 80, height = 5, homeLogo, compactLogo, toolbar, ip }) => (
+}> = memo(({ width = 80, height = 5, toolbar }) => (
   <Panel width={width} height={height} borderStyle="round" paddingX={1} paddingY={0}>
-    <Box width={width - 2} flexDirection="row" justifyContent="space-between" alignItems="center">
-      <Box>
-        {ready ? (page === null ? homeLogo : compactLogo) : <FallbackTop ip={ip} />}
-      </Box>
-      {toolbar ? <Box>{toolbar}</Box> : <Box><Hint dim>{ready ? '' : '…'}</Hint></Box>}
+    <Box width={width - 4} flexDirection="row" alignItems="flex-start">
+      {toolbar ?? null}
     </Box>
   </Panel>
 ));

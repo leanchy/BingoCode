@@ -72,26 +72,44 @@ function bunExists() {
   }
 }
 
-// 安装 bun
+// 安装 bun（通过 npm 拉取官方包，不走 GitHub/bun.sh）
 function installBun() {
-  console.log('[bingocode] bun 未检测到，正在自动安装...');
+  console.log('[bingocode] bun 未检测到，正在通过 npm 安装...');
+
+  // 用 npm install 拉取平台对应包，安装到临时目录后复制 bun.exe
+  const tmpDir = path.join(os.tmpdir(), 'bingocode-bun-install');
   try {
-    const result = spawnSync(
-      'powershell',
-      ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command',
-       'irm bun.sh/install.ps1 | iex'],
-      { stdio: 'inherit', shell: false }
+    fs.mkdirSync(tmpDir, { recursive: true });
+
+    // npm install @oven/bun-windows-x64 到临时目录
+    const npmResult = spawnSync(
+      'npm',
+      ['install', '@oven/bun-windows-x64', '--prefix', tmpDir, '--no-save', '--loglevel', 'error'],
+      { stdio: 'inherit', shell: true }
     );
-    if (result.status !== 0) {
-      throw new Error(`Exit code ${result.status}`);
+    if (npmResult.status !== 0) {
+      throw new Error(`npm install 失败，exit code ${npmResult.status}`);
     }
+
+    // 从 node_modules 复制 bun.exe → ~/.bun/bin/bun.exe
+    const src = path.join(tmpDir, 'node_modules', '@oven', 'bun-windows-x64', 'bin', 'bun.exe');
+    if (!fs.existsSync(src)) {
+      throw new Error(`未找到 ${src}`);
+    }
+    const destDir = path.dirname(bunPath);
+    if (!fs.existsSync(destDir)) fs.mkdirSync(destDir, { recursive: true });
+    fs.copyFileSync(src, bunPath);
+
     console.log('[bingocode] bun 安装完成，正在启动...');
+    return true;
   } catch (err) {
     console.error(`[bingocode] bun 自动安装失败: ${err.message}`);
-    console.log('[bingocode] 请手动从 https://bun.sh 安装 Bun 后重试。');
+    console.log('[bingocode] 请手动安装 bun: npm install -g @oven/bun-windows-x64');
     return false;
+  } finally {
+    // 清理临时目录（非阻塞）
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch (_) {}
   }
-  return true;
 }
 
 if (!bunExists()) {

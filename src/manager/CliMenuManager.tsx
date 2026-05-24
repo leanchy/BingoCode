@@ -72,41 +72,52 @@ async function buildSpawnEnv(): Promise<NodeJS.ProcessEnv> {
   return base;
 }
 
-// Top height: Home fits LogoV2 + Toolbar, other pages more compact
-const TOP_H_HOME = Number(process.env.CLI_TOP_H_HOME || 9);
-const TOP_H_COMPACT = Number(process.env.CLI_TOP_H_COMPACT || 6);
+// Top height: Home = Clawd(3 rows) + border(2) = 5; Compact = 1 row + border(2) = 3
+const TOP_H_HOME = Number(process.env.CLI_TOP_H_HOME || 5);
+const TOP_H_COMPACT = Number(process.env.CLI_TOP_H_COMPACT || 3);
 // Bottom bar height
 const BOTTOM_H = Number(process.env.CLI_BOTTOM_H || 3);
 
+const LANG_OPTIONS = [
+  { label: 'English', value: 'en' as const },
+  { label: '中文',    value: 'zh' as const },
+  { label: '日本語',  value: 'ja' as const },
+];
+
 const i18nMap = {
-    zh: {
-      menu: {
-        newSession: 'New Session',
-        history: 'History',
-        provider: 'API Config',
-        settings: 'Settings',
-        about: 'About',
-        exit: 'Exit',
-      },
-      about: 'Bingo CLI - Version Info & About',
-      aboutContent: [
-        'Bingo is an AI assistant terminal client.',
-        'Author: leanchy (Email: leanchy07@outlook.com)',
-        'Github: github.com/leanchy/bingo-claude-code-offline-installer',
-        '1. API Config: Press "P" or select "API Config" to set up your keys.',
-        '2. Model Slots: Configure specific models in the Provider panel.',
-        '3. Background Service: Bingo runs a local server to manage sessions.',
-        '4. Start Chat: Run `bingocode` or `claude` in any terminal to start.',
-      ].join('\n'),
-      mark: '→ Mark Session',
-      unmark: '→ Unmark Session',
-      tipsSimple: 'L Lang | ESC Back | ←→ Menu | ↩ Enter | ? Help',
-      noData: 'No data',
-      emptyHistory: 'Nothing here yet. Start a new session?',
-      deleting: 'Delete this session? (Irreversible)',
-      historyHint: 'Enter to open · j next · k first · q back',
-      helpTitle: 'Shortcuts',
+  zh: {
+    menu: {
+      newSession: '新建会话',
+      history: '会话历史',
+      provider: 'API 配置',
+      settings: '设置',
+      about: '关于',
+      exit: '退出',
     },
+    about: 'Bingo CLI 终端 - 版本信息与关于',
+    aboutContent: [
+      'Bingo 是一款 AI 助手终端客户端。',
+      '1. API 配置：按 "P" 或选择「API 配置」来设置你的密钥。',
+      '2. 模型槽：在 Provider 面板中配置各模型。',
+      '3. 后台服务：Bingo 会运行一个本地服务器来管理会话。',
+      '4. 开始聊天：在任意终端中运行 `bingocode` 或 `claude`。',
+    ].join('\n'),
+    aboutFooter: '作者: leanchy (leanchy07@outlook.com)  ·  github.com/leanchy/claude-code-bingo',
+    mark: '→ 标记会话',
+    unmark: '→ 取消标记',
+    tipsSimple: 'L 语言 | ESC 返回 | ←→ 菜单 | ↩ 确认 | ? 帮助',
+    noData: '暂无数据',
+    emptyHistory: '还没有会话，要新建一个吗？',
+    deleting: '确定删除此会话？（不可恢复）',
+    historyHint: '↩ 打开 · j 下一页 · k 首页 · q 返回',
+    helpTitle: '快捷键',
+    // Settings page
+    settingsTitle: '设置',
+    langLabel: '语言',
+    langPickerTitle: '选择语言',
+    settingsHint: '↑/k ↓/j 滚动 · ↩ 编辑 · ESC 返回',
+    langOptions: LANG_OPTIONS,
+  },
   en: {
     menu: {
       newSession: 'New Session',
@@ -119,13 +130,12 @@ const i18nMap = {
     about: 'Bingo CLI Terminal - Version Info & About',
     aboutContent: [
       'Bingo is an AI assistant terminal client.',
-      'Author: leanchy (Email: leanchy07@outlook.com)',
-      'Github: github.com/leanchy/bingo-claude-code-offline-installer',
       '1. API Config: Press "P" or select "API Config" to set up your keys.',
       '2. Model Slots: Configure specific models in the Provider panel.',
       '3. Background Service: Bingo runs a local server to manage sessions.',
       '4. Start Chat: Run `bingocode` or `claude` in any terminal to start.',
     ].join('\n'),
+    aboutFooter: 'Author: leanchy (leanchy07@outlook.com)  ·  github.com/leanchy/claude-code-bingo',
     mark: '→ Mark Session',
     unmark: '→ Unmark Session',
     tipsSimple: 'L Lang | ESC Back | ←→ Menu | ↩ Enter | ? Help',
@@ -134,7 +144,46 @@ const i18nMap = {
     deleting: 'Delete this session? (Irreversible)',
     historyHint: 'Enter to open · j next · k first · q back',
     helpTitle: 'Shortcuts',
-  }
+    // Settings page
+    settingsTitle: 'Settings',
+    langLabel: 'Language',
+    langPickerTitle: 'Select Language',
+    settingsHint: '↑/k ↓/j scroll · ↩ edit · ESC back',
+    langOptions: LANG_OPTIONS,
+  },
+  ja: {
+    menu: {
+      newSession: '新規セッション',
+      history: 'セッション履歴',
+      provider: 'API設定',
+      settings: '設定',
+      about: 'について',
+      exit: '終了',
+    },
+    about: 'Bingo CLI ターミナル - バージョン情報',
+    aboutContent: [
+      'BingoはAIアシスタントのターミナルクライアントです。',
+      '1. API設定: "P"キーまたは「API設定」を選択してキーを設定。',
+      '2. モデルスロット: Providerパネルで各モデルを設定。',
+      '3. バックグラウンドサービス: セッション管理用ローカルサーバーを起動。',
+      '4. チャット開始: 任意のターミナルで `bingocode` または `claude` を実行。',
+    ].join('\n'),
+    aboutFooter: '作者: leanchy (leanchy07@outlook.com)  ·  github.com/leanchy/claude-code-bingo',
+    mark: '→ セッションをマーク',
+    unmark: '→ マークを解除',
+    tipsSimple: 'L 言語 | ESC 戻る | ←→ メニュー | ↩ 決定 | ? ヘルプ',
+    noData: 'データなし',
+    emptyHistory: 'まだセッションがありません。新規作成しますか？',
+    deleting: 'このセッションを削除しますか？（元に戻せません）',
+    historyHint: '↩ 開く · j 次へ · k 最初へ · q 戻る',
+    helpTitle: 'ショートカット',
+    // Settings page
+    settingsTitle: '設定',
+    langLabel: '言語',
+    langPickerTitle: '言語を選択',
+    settingsHint: '↑/k ↓/j スクロール · ↩ 編集 · ESC 戻る',
+    langOptions: LANG_OPTIONS,
+  },
 };
 
 const menuKeys = [
@@ -245,9 +294,11 @@ export const CliMenuManager: React.FC = () => {
     if (configReady) {
       try {
         const cfg = getGlobalConfig();
-        if (cfg.language && (cfg.language === 'en' || cfg.language === 'zh')) {
+        if (cfg.language && (cfg.language === 'en' || cfg.language === 'zh' || cfg.language === 'ja')) {
           setLang(cfg.language as Lang);
         }
+        if (typeof cfg.uiAnimEnabled === 'boolean') setAnimEnabled(cfg.uiAnimEnabled);
+        if (typeof cfg.uiTipsEnabled === 'boolean') setTipsEnabled(cfg.uiTipsEnabled);
       } catch (e) {
         // Silently fail if config has issues
       }
@@ -296,6 +347,8 @@ export const CliMenuManager: React.FC = () => {
   const [settingData, setSettingData] = useState<any>(null);
   const [loadingSetting, setLoadingSetting] = useState(false);
   const [setErr, setSetErr] = useState<string | null>(null);
+  const [settingsStage, setSettingsStage] = useState<'list' | 'langPicker'>('list');
+  const [settingsCursor, setSettingsCursor] = useState(0);
 
   // Top toolbar state
   const [animEnabled, setAnimEnabled] = useState(true);
@@ -375,6 +428,8 @@ export const CliMenuManager: React.FC = () => {
     }
     if (page !== 'settings') {
       setSettingsOffset(0);
+      setSettingsStage('list');
+      setSettingsCursor(0);
     }
     // Close help overlay
     setShowHelp(false);
@@ -517,9 +572,10 @@ export const CliMenuManager: React.FC = () => {
 
   // Keyboard interactions
   useInput((input, key) => {
-    // Language toggle
+    // Language toggle (en → zh → ja → en)
     if (input === 'l' || input === 'L') {
-      const nextLang = lang === 'zh' ? 'en' : 'zh';
+      const langOrder: Lang[] = ['en', 'zh', 'ja'];
+      const nextLang = langOrder[(langOrder.indexOf(lang) + 1) % langOrder.length];
       setLang(nextLang);
       try {
         const cfg = getGlobalConfig();
@@ -546,12 +602,20 @@ export const CliMenuManager: React.FC = () => {
 
     // Top animation toggle (O)
     if (input === 'o' || input === 'O') {
-      setAnimEnabled(v => !v);
+      setAnimEnabled(v => {
+        const next = !v;
+        try { const cfg = getGlobalConfig(); cfg.uiAnimEnabled = next; saveGlobalConfig(cfg); } catch {}
+        return next;
+      });
       return;
     }
     // Top Tips toggle (T)
     if (input === 't' || input === 'T') {
-      setTipsEnabled(v => !v);
+      setTipsEnabled(v => {
+        const next = !v;
+        try { const cfg = getGlobalConfig(); cfg.uiTipsEnabled = next; saveGlobalConfig(cfg); } catch {}
+        return next;
+      });
       return;
     }
 
@@ -565,6 +629,10 @@ export const CliMenuManager: React.FC = () => {
     if (key.escape) {
       if (showHelp) { setShowHelp(false); return; }
       if (page === 'provider') return; // Handled internally
+      // Settings: langPicker → back to list; list → back to main menu
+      if (page === 'settings') {
+        if (settingsStage === 'langPicker') { setSettingsStage('list'); return; }
+      }
       setPage(null);
       setHistoryMenuStage('list');
       setSelectedHistory(null);
@@ -672,18 +740,30 @@ export const CliMenuManager: React.FC = () => {
       }
     }
 
-    // Settings scrolling
-    if (!showHelp && page === 'settings' && settingData && typeof settingData === 'object') {
-      const total = Object.keys(settingData).length;
-      const visible = Math.max(1, MID_H - 1);
-      if (key.downArrow || input === 'j') {
-        setSettingsOffset(o => Math.min(Math.max(0, total - visible), o + 1));
+    // Settings interactions
+    if (!showHelp && page === 'settings') {
+      if (settingsStage === 'list') {
+        // +1 for the fixed Language row prepended before settingData entries
+        const totalRows = 1 + (settingData && typeof settingData === 'object' ? Object.keys(settingData).length : 0);
+        const visible = Math.max(1, MID_H - 2);
+        if (key.downArrow || input === 'j') {
+          setSettingsCursor(c => Math.min(totalRows - 1, c + 1));
+          setSettingsOffset(o => Math.min(Math.max(0, totalRows - visible), o + 1));
+        }
+        if (key.upArrow || input === 'k') {
+          setSettingsCursor(c => Math.max(0, c - 1));
+          setSettingsOffset(o => Math.max(0, o - 1));
+        }
+        if (key.return) {
+          // Row 0 is the interactive Language row
+          if (settingsCursor === 0) {
+            setSettingsStage('langPicker');
+          }
+        }
       }
-      if (key.upArrow || input === 'k') {
-        setSettingsOffset(o => Math.max(0, o - 1));
-      }
+      // langPicker stage: ESC handled above; selection via SelectInput onSelect
     }
-  }, [menuItems, page, historyMenuStage, historyList, historyHasMore, navIndex, sessionMessages, settingData, MID_H, MSGS_PAGE_SIZE, showHelp, theme]);
+  }, [menuItems, page, historyMenuStage, historyList, historyHasMore, navIndex, sessionMessages, settingData, MID_H, MSGS_PAGE_SIZE, showHelp, theme, settingsStage, settingsCursor]);
 
   function cleanText(text: string): string {
     return String(text ?? '').replace(/[\n\r]+/g, ' ').replace(/\u001b\[[0-9;]*m/g, '').trim();
@@ -917,7 +997,7 @@ export const CliMenuManager: React.FC = () => {
         <Text color="cyan">R</Text><Text>  Quick Resume</Text>
         <Text color="cyan">P</Text><Text>  Open Provider Config</Text>
         <Text color="cyan">G</Text><Text>  Toggle Theme (light/dark/highContrast)</Text>
-        <Text color="cyan">L</Text><Text>  Toggle Language (en/zh)</Text>
+        <Text color="cyan">L</Text><Text>  Toggle Language (en → zh → ja)</Text>
         <Text color="cyan">O</Text><Text>  Toggle Top Animation</Text>
         <Text color="cyan">T</Text><Text>  Toggle Top Tips</Text>
         <Text color="cyan">?</Text><Text>  Toggle Help</Text>
@@ -997,7 +1077,7 @@ export const CliMenuManager: React.FC = () => {
         return <StateDisplay type="empty" message={i18nMap[lang].emptyHistory} />;
       }
 
-      const ACTIONS_H = 6;
+      const ACTIONS_H = 7; // Actions title(1) + 4 items + hint(1) + padding(1)
       const LIST_H = Math.max(2, MID_H - ACTIONS_H - 1);
 
       if (historyMenuStage === 'window' && selectedHistory) {
@@ -1044,7 +1124,7 @@ export const CliMenuManager: React.FC = () => {
               )}
             </Box>
 
-            <Box height={1} marginBottom={0}><Text dimColor>{'─'.repeat(VIEW_W - 2)}</Text></Box>
+            <Box height={1} marginBottom={0}><Text dimColor>{'─'.repeat(VIEW_W - 4)}</Text></Box>
 
             {/* Lower Pane: Actions */}
             <Box height={ACTIONS_H} paddingX={1} flexDirection="column" overflow="hidden">
@@ -1062,41 +1142,46 @@ export const CliMenuManager: React.FC = () => {
       }
 
 	    // History List View (Default)
+	    // MID_H - 1 (hint bar at top) - 1 (scrollbar safety) = MID_H - 2 visible items
 	    const HIST_VISIBLE = MID_H - 2;
 	    const start = Math.min(listOffset, Math.max(0, groupedHistoryItems.length - HIST_VISIBLE));
 	    const slicedItems = groupedHistoryItems.slice(start, start + HIST_VISIBLE);
 
 	    return (
-	      <Box width={VIEW_W} height={MID_H} flexDirection="row" position="relative">
-	        <Box flexDirection="column" flexGrow={1} paddingX={1}>
-	          <SelectInput
-	            key={`${historyCursor ?? 'first'}:${slicedItems.length}:${start}`}
-	            items={slicedItems}
-	            onSelect={item => {
-	              if (String(item.value).startsWith('__group_')) return;
-	              const session = historyList.find(h => h.id === item.value);
-	              if (session) {
-	                setSelectedHistory(session);
-	                setHistoryMenuStage('window');
-	              }
-	            }}
-	            itemComponent={({ isSelected, label }) => {
-	              const it = groupedHistoryItems.find(i => i.label === label);
-	              const isGroup = it?.isGroup;
-	              const color = it?.color;
-	              return (
-	                <Box height={1} overflow="hidden">
-	                  <Text wrap="truncate" color={isGroup ? 'gray' : (color ? color : (isSelected ? 'cyan' : undefined))}>
-	                    {isSelected ? '> ' : '  '}{label}
-	                  </Text>
-	                </Box>
-	              )
-	            }}
-	          />
-	        </Box>
-	        <ScrollBar total={groupedHistoryItems.length} offset={start} height={MID_H - 2} />
-	        <Box position="absolute" bottom={0} left={1} width={VIEW_W - 4}>
+	      <Box width={VIEW_W} height={MID_H} flexDirection="column">
+	        {/* Hint bar — fixed 1 row at top, never overlaps list */}
+	        <Box height={1} paddingX={1}>
 	          <Hint>{i18nMap[lang].historyHint}</Hint>
+	        </Box>
+	        {/* List area — takes the rest of the height */}
+	        <Box flexDirection="row" flexGrow={1} position="relative">
+	          <Box flexDirection="column" flexGrow={1} paddingX={1}>
+	            <SelectInput
+	              key={`${historyCursor ?? 'first'}:${slicedItems.length}:${start}`}
+	              items={slicedItems}
+	              onSelect={item => {
+	                if (String(item.value).startsWith('__group_')) return;
+	                const session = historyList.find(h => h.id === item.value);
+	                if (session) {
+	                  setSelectedHistory(session);
+	                  setHistoryMenuStage('window');
+	                }
+	              }}
+	              itemComponent={({ isSelected, label }) => {
+	                const it = groupedHistoryItems.find(i => i.label === label);
+	                const isGroup = it?.isGroup;
+	                const color = it?.color;
+	                return (
+	                  <Box height={1} overflow="hidden">
+	                    <Text wrap="truncate" color={isGroup ? 'gray' : (color ? color : (isSelected ? 'cyan' : undefined))}>
+	                      {isSelected ? '> ' : '  '}{label}
+	                    </Text>
+	                  </Box>
+	                )
+	              }}
+	            />
+	          </Box>
+	          <ScrollBar total={groupedHistoryItems.length} offset={start} height={MID_H - 3} />
 	        </Box>
 	      </Box>
 	    );
@@ -1127,18 +1212,84 @@ export const CliMenuManager: React.FC = () => {
     if (page === 'settings') {
       if (loadingSetting) return <StateDisplay type="loading" message="Loading settings..." />;
       if (setErr) return <StateDisplay type="error" message={setErr} />;
-      if (!settingData || typeof settingData !== 'object') return <StateDisplay type="empty" message="No settings found" />;
-      const entries = Object.entries(settingData);
-      const visible = Math.max(1, MID_H - 1);
-      const start = Math.min(settingsOffset, Math.max(0, entries.length - visible));
-      const sliced = entries.slice(start, start + visible);
+
+      const tS = i18nMap[lang];
+      const currentLangLabel = LANG_OPTIONS.find(o => o.value === lang)?.label ?? lang;
+
+      // --- langPicker sub-menu ---
+      if (settingsStage === 'langPicker') {
+        return (
+          <Box width={VIEW_W} height={MID_H} flexDirection="column">
+            <Box paddingX={1} marginBottom={1}>
+              <Text color="magenta" bold>{tS.langPickerTitle}</Text>
+            </Box>
+            <Box paddingX={2} flexGrow={1} flexDirection="column">
+              <SelectInput
+                items={tS.langOptions}
+                initialIndex={tS.langOptions.findIndex(o => o.value === lang)}
+                onSelect={(item: { label: string; value: Lang }) => {
+                  setLang(item.value);
+                  try {
+                    const cfg = getGlobalConfig();
+                    cfg.language = item.value;
+                    saveGlobalConfig(cfg);
+                  } catch {}
+                  setSettingsStage('list');
+                }}
+              />
+            </Box>
+            <Box paddingX={1}>
+              <Hint>↩ confirm · ESC back</Hint>
+            </Box>
+          </Box>
+        );
+      }
+
+      // --- settings list ---
+      type SettingRow = { key: string; label: string; value: string; interactive: boolean };
+      const fixedRows: SettingRow[] = [
+        { key: '__lang', label: tS.langLabel, value: currentLangLabel, interactive: true },
+      ];
+      const dataEntries = settingData && typeof settingData === 'object' ? Object.entries(settingData) : [];
+      const dataRows: SettingRow[] = dataEntries.map(([k, v]) => ({
+        key: k,
+        label: k,
+        value: typeof v === 'object' ? JSON.stringify(v) : String(v),
+        interactive: false,
+      }));
+      const allRows: SettingRow[] = [...fixedRows, ...dataRows];
+      const visible = Math.max(1, MID_H - 2);
+      const start = Math.min(settingsOffset, Math.max(0, allRows.length - visible));
+      const sliced = allRows.slice(start, start + visible);
+
       return (
         <Box width={VIEW_W} height={MID_H} flexDirection="column">
-          <ScrollBar total={entries.length} offset={start} height={visible - 1} />
-          {sliced.map(([k, v]) => <Text key={k}>{k}: {typeof v === 'object' ? JSON.stringify(v) : String(v)}</Text>)}
-          <Hint>
-            ↑/k and ↓/j scroll · {start+1}-{Math.min(start+visible, entries.length)}/{entries.length}
-          </Hint>
+          <Box flexDirection="row" position="relative" flexGrow={1}>
+            <Box flexDirection="column" flexGrow={1} paddingX={1} overflow="hidden">
+              {sliced.map((row, idx) => {
+                const absIdx = start + idx;
+                const isCursor = absIdx === settingsCursor;
+                const prefix = isCursor ? '>' : ' ';
+                const labelColor = isCursor ? 'cyan' : (row.interactive ? 'white' : 'gray');
+                const valueColor = row.interactive ? 'green' : undefined;
+                return (
+                  <Box key={row.key} height={1}>
+                    <Text color={labelColor}>
+                      {prefix} {row.label}:{'  '}
+                      <Text color={valueColor ?? (isCursor ? 'white' : 'gray')}>
+                        {row.value}
+                        {row.interactive ? '  ↩' : ''}
+                      </Text>
+                    </Text>
+                  </Box>
+                );
+              })}
+            </Box>
+            <ScrollBar total={allRows.length} offset={start} height={visible - 1} />
+          </Box>
+          <Box paddingX={1}>
+            <Hint>{tS.settingsHint}  ·  {start + 1}-{Math.min(start + visible, allRows.length)}/{allRows.length}</Hint>
+          </Box>
         </Box>
       );
     }
@@ -1155,6 +1306,9 @@ export const CliMenuManager: React.FC = () => {
             <Hint>
               API Base: {apiUrl}
             </Hint>
+          </Box>
+          <Box marginTop={1}>
+            <Text color="gray">{(i18nMap[lang] as any).aboutFooter}</Text>
           </Box>
         </Box>
       );
@@ -1189,15 +1343,13 @@ export const CliMenuManager: React.FC = () => {
         page={page}
         width={VIEW_W}
         height={TOP_H}
-        homeLogo={<LogoV2 />}
-        compactLogo={<CondensedLogo />}
-        ip={apiUrl ? apiUrl.replace(/^https?:\/\//, '') : undefined}
         toolbar={
           <TopToolbar
             ready={configReady}
             page={page}
             animEnabled={animEnabled}
             tipsEnabled={tipsEnabled}
+            ip={apiUrl ? apiUrl.replace(/^https?:\/\//, '') : undefined}
           />
         }
       />

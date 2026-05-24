@@ -1,11 +1,9 @@
-//@C:M ID=M.UI.TopToolbar;K=M;V=1.2;P=top toolbar;D=CLI;M=cli;S=ui
+//@C:M ID=M.UI.TopToolbar;K=M;V=1.3;P=top toolbar;D=CLI;M=cli;S=ui
 import React, { memo, useMemo } from 'react';
-import { Box } from 'ink';
-import { Chip, ChipRow } from './CliMenuUi.tsx';
+import { Box, Text } from 'ink';
+import { Chip } from './CliMenuUi.tsx';
 import { useTheme } from '../components/design-system/ThemeProvider.js';
-import { getGlobalConfig, getCurrentProjectConfig, isPathTrusted, checkHasTrustDialogAccepted } from '../utils/config.ts';
-import { getCwd } from '../utils/cwd.js';
-// Update: Import respectively according to the new interface
+import { getGlobalConfig } from '../utils/config.ts';
 import type { ClawdPose } from '../components/LogoV2/Clawd.tsx';
 import { Clawd } from '../components/LogoV2/Clawd.tsx';
 import { AnimatedClawd } from '../components/LogoV2/AnimatedClawd.tsx';
@@ -15,95 +13,84 @@ type Props = {
   page: string | null;
   animEnabled: boolean;
   tipsEnabled: boolean;
+  ip?: string;
 };
 
-function basename(p: string) {
-  if (!p) return '';
-  const parts = p.split(/[/\\]/).filter(Boolean);
-  return parts[parts.length - 1] || p;
-}
-function ellipsisPath(p: string, keep = 2) {
-  if (!p) return '';
-  const parts = p.split(/[/\\]/).filter(Boolean);
-  if (parts.length <= keep) return p;
-  return '…/' + parts.slice(-keep).join('/');
-}
-
-//@C:F ID=F.UI.TopToolbar;K=F;V=1.2;P=toolbar;D=CLI;M=cli;S=ui;In=Props;Out=JSX.Element
-export const TopToolbar: React.FC<Props> = memo(({ ready, page, animEnabled, tipsEnabled }) => {
+//@C:F ID=F.UI.TopToolbar;K=F;V=1.4;P=toolbar;D=CLI;M=cli;S=ui;In=Props;Out=JSX.Element
+export const TopToolbar: React.FC<Props> = memo(({ ready, page, animEnabled, tipsEnabled, ip }) => {
   const [theme] = useTheme();
 
-  // Only read config and trust status when ready
-  const { cwd, trustAccepted, trustedPath, projectName } = useMemo(() => {
-    if (!ready) {
-      return { cwd: '', trustAccepted: undefined as undefined|boolean, trustedPath: undefined as undefined|boolean, projectName: '' };
-    }
-    const _cwd = getCwd();
-    const _trustAccepted = checkHasTrustDialogAccepted();
-    const _trustedPath = isPathTrusted(_cwd);
-    let _projectName = '';
+  const { version } = useMemo(() => {
     try {
-      const prj = getCurrentProjectConfig();
-      _projectName = (prj && (prj.name || prj.projectName || prj.id)) || basename(_cwd);
+      const cfg = getGlobalConfig();
+      return { version: (cfg as any)?.version ?? '' };
     } catch {
-      _projectName = basename(_cwd);
+      return { version: '' };
     }
-    return { cwd: _cwd, trustAccepted: _trustAccepted, trustedPath: _trustedPath, projectName: _projectName };
-  }, [ready]);
+  }, []);
 
-  const compact = page !== null;
-  const cwdShort = useMemo(() => ellipsisPath(cwd, compact ? 2 : 3), [cwd, compact]);
-
-  // Theme name
   const themeLabel = String(theme || (ready ? (getGlobalConfig()?.theme ?? 'system') : '…'));
+  const uiChipValue = `Anim ${animEnabled ? 'On' : 'Off'} · Tips ${tipsEnabled ? 'On' : 'Off'}`;
+  const uiTone = (String(theme) === 'dark') ? 'accent' : (String(theme) === 'highContrast' ? 'warning' : 'info');
 
-  // Static Clawd pose
   const clawdPose: ClawdPose = useMemo(() => {
     if (!ready) return 'default';
     if (page === null) return animEnabled ? 'arms-up' : 'default';
     return tipsEnabled ? 'look-left' : 'look-right';
   }, [ready, page, animEnabled, tipsEnabled]);
 
-  const uiTone = (String(theme) === 'dark') ? 'accent' : (String(theme) === 'highContrast' ? 'warning' : 'info');
-
-  return (
-    <Box flexDirection="column" minHeight={3}>
-      <ChipRow>
-        {/* Left: Clawd + Core Status */}
-        <Box>
-          <Box marginRight={2}>
-            {animEnabled ? <AnimatedClawd /> : <Clawd pose={clawdPose} />}
-          </Box>
-
+  // ── Compact mode (page !== null): single line, no logo ──────────────
+  if (page !== null) {
+    return (
+      <Box flexDirection="row" alignItems="center">
+        <Text bold>Bingo Code</Text>
+        <Box marginLeft={1}>
           <Chip label="Theme" value={themeLabel} tone="accent" />
-          <Chip label="Project" value={projectName || '—'} tone="info" />
-          <Chip label="CWD" value={cwdShort || '—'} tone="subtle" />
-          {trustedPath === undefined || trustAccepted === undefined ? (
-            <Chip label="Trust" value="…" tone="subtle" />
-          ) : trustedPath && trustAccepted ? (
-            <Chip label="Trust" value="✅ Trusted" tone="success" />
+        </Box>
+        <Chip label="UI" value={uiChipValue} tone={uiTone as any} />
+        {ip ? (
+          <Text color="green" dimColor> · IP: {ip}</Text>
+        ) : (
+          <Text color="yellow" dimColor> · {ready ? 'Server ready' : 'Starting…'}</Text>
+        )}
+      </Box>
+    );
+  }
+
+  // ── Home mode (page === null): Clawd left + 3-row right column ───────
+  return (
+    <Box flexDirection="row" alignItems="flex-start">
+      {/* Left: Clawd sprite */}
+      <Box marginRight={2}>
+        {animEnabled ? <AnimatedClawd /> : <Clawd pose={clawdPose} />}
+      </Box>
+
+      {/* Right: 3 rows */}
+      <Box flexDirection="column">
+        {/* Row 1: brand + version + chips */}
+        <Box flexDirection="row" alignItems="center">
+          <Text bold>Welcome to Bingo Code</Text>
+          {version ? <Text dimColor> v{version}</Text> : null}
+          <Box marginLeft={1}>
+            <Chip label="Theme" value={themeLabel} tone="accent" />
+          </Box>
+          <Chip label="UI" value={uiChipValue} tone={uiTone as any} />
+        </Box>
+
+        {/* Row 2: IP / server status */}
+        <Box>
+          {ip ? (
+            <Text color="green" dimColor>IP: {ip}</Text>
           ) : (
-            <Chip label="Trust" value="🔒 Untrusted" tone="warning" />
+            <Text color="yellow" dimColor>{ready ? 'Server ready' : 'Starting server…'}</Text>
           )}
         </Box>
 
-        {/* Right: UI Status merged display */}
+        {/* Row 3: keyboard shortcuts */}
         <Box>
-          <Chip
-            label="UI"
-            value={`Anim ${animEnabled ? 'On' : 'Off'} · Tips ${tipsEnabled ? 'On' : 'Off'}`}
-            tone={uiTone as any}
-          />
+          <Text dimColor>N New · R Resume · P Provider · G Theme · ? Help</Text>
         </Box>
-      </ChipRow>
-
-      {!compact && (
-        <ChipRow>
-          <Box>
-            <Chip label="Shortcuts" value="N New · R Resume · P Provider · G Theme · ? Help" tone="subtle" />
-          </Box>
-        </ChipRow>
-      )}
+      </Box>
     </Box>
   );
 });

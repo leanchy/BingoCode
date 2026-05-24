@@ -47,6 +47,12 @@ export function anthropicToOpenaiResponses(body: AnthropicRequest): OpenAIRespon
   if (body.temperature !== undefined) result.temperature = body.temperature
   if (body.top_p !== undefined) result.top_p = body.top_p
 
+  // frequency_penalty: suppress repetition loops during multi-tool-call sequences.
+  // Anthropic API has no equivalent; inject for all OpenAI-compatible upstreams.
+  // Configurable via BINGO_FREQUENCY_PENALTY (default 0.1).
+  const fp = parseFloat(process.env.BINGO_FREQUENCY_PENALTY ?? '0.1')
+  if (!isNaN(fp) && fp !== 0) result.frequency_penalty = fp
+
   // tools
   if (body.tools && body.tools.length > 0) {
     result.tools = body.tools
@@ -100,6 +106,26 @@ function convertMessageToInputItems(msg: AnthropicMessage, output: OpenAIRespons
   // Collect text/image parts and handle tool blocks separately
   const contentParts: (string | OpenAIChatContentPart)[] = []
 
+  /** Flush accumulated contentParts as a message input item. Preserves image objects. */
+  function flushContentParts(): void {
+    if (contentParts.length === 0) return
+    let flushed: string | OpenAIChatContentPart[]
+    const hasRich = contentParts.some((p) => typeof p !== 'string')
+    if (hasRich) {
+      // Mixed text + images: emit as content-part array
+      flushed = contentParts.map((p) =>
+        typeof p === 'string' ? { type: 'text' as const, text: p } : p,
+      )
+    } else {
+      // Pure text: emit as plain string
+      flushed = (contentParts as string[]).join('')
+    }
+    contentParts.length = 0
+    if (flushed && (typeof flushed === 'string' ? flushed : flushed.length > 0)) {
+      output.push({ type: 'message', role: msg.role, content: flushed })
+    }
+  }
+
   for (const block of content) {
     if (block.type === 'text') {
       contentParts.push(block.text)
@@ -110,15 +136,7 @@ function convertMessageToInputItems(msg: AnthropicMessage, output: OpenAIRespons
       })
     } else if (block.type === 'tool_use') {
       // Flush any accumulated content first
-      if (contentParts.length > 0) {
-        const flatContent = contentParts.length === 1 && typeof contentParts[0] === 'string'
-          ? contentParts[0]
-          : contentParts.map((p) => typeof p === 'string' ? p : '').join('')
-        if (flatContent) {
-          output.push({ type: 'message', role: msg.role, content: flatContent })
-        }
-        contentParts.length = 0
-      }
+      flushContentParts()
       // Lift to function_call item
       output.push({
         type: 'function_call',
@@ -128,11 +146,14 @@ function convertMessageToInputItems(msg: AnthropicMessage, output: OpenAIRespons
       })
     } else if (block.type === 'tool_result') {
       // Lift to function_call_output item
-      const resultContent = typeof block.content === 'string'
+      const rawContent = typeof block.content === 'string'
         ? block.content
         : Array.isArray(block.content)
           ? block.content.filter((b): b is Extract<AnthropicContentBlock, { type: 'text' }> => b.type === 'text').map((b) => b.text).join('\n')
           : ''
+      const resultContent = block.is_error
+        ? `<error>${rawContent}</error>`
+        : rawContent
       output.push({
         type: 'function_call_output',
         call_id: block.tool_use_id,
@@ -143,14 +164,7 @@ function convertMessageToInputItems(msg: AnthropicMessage, output: OpenAIRespons
   }
 
   // Flush remaining content
-  if (contentParts.length > 0) {
-    const flatContent = contentParts.length === 1 && typeof contentParts[0] === 'string'
-      ? contentParts[0]
-      : contentParts.map((p) => typeof p === 'string' ? p : '').join('')
-    if (flatContent) {
-      output.push({ type: 'message', role: msg.role, content: flatContent })
-    }
-  }
+  flushContentParts()
 }
 
 function convertToolChoice(choice: unknown): unknown {

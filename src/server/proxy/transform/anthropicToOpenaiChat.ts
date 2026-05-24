@@ -43,20 +43,29 @@ export function anthropicToOpenaiChat(body: AnthropicRequest): OpenAIChatRequest
     stream: body.stream,
   }
 
-  // max_tokens — limit for DeepSeek to avoid invalid parameter errors
+  // max_tokens — cap to avoid upstream 400 errors from Claude's high defaults (e.g. 64k).
+  // DeepSeek: tools/thinking fail above 8192. Other providers: 32768 covers most upstreams.
+  // GPT models (gpt-*): use max_completion_tokens instead of max_tokens (required by newer GPT models).
   if (body.max_tokens !== undefined) {
-    if (body.model.toLowerCase().includes('deepseek')) {
-      // DeepSeek R1 often fails if max_tokens is set to Claude's high defaults (like 128k)
-      // Especially when tools or thinking are involved. 8192 is a safe upper limit for most.
+    const modelLower = body.model.toLowerCase()
+    if (modelLower.includes('deepseek')) {
       result.max_tokens = Math.min(body.max_tokens, 8192)
+    } else if (modelLower.startsWith('gpt-') || modelLower.startsWith('o1') || modelLower.startsWith('o3') || modelLower.startsWith('o4')) {
+      result.max_completion_tokens = body.max_tokens
     } else {
-      result.max_tokens = body.max_tokens
+      result.max_tokens = Math.min(body.max_tokens, 32768)
     }
   }
 
   // temperature & top_p
   if (body.temperature !== undefined) result.temperature = body.temperature
   if (body.top_p !== undefined) result.top_p = body.top_p
+
+  // frequency_penalty: suppress repetition loops during multi-tool-call sequences.
+  // Anthropic API has no equivalent; inject for all OpenAI-compatible upstreams.
+  // Configurable via BINGO_FREQUENCY_PENALTY (default 0.1).
+  const fp = parseFloat(process.env.BINGO_FREQUENCY_PENALTY ?? '0.1')
+  if (!isNaN(fp) && fp !== 0) result.frequency_penalty = fp
 
   // stop_sequences → stop
   if (body.stop_sequences && body.stop_sequences.length > 0) {
@@ -83,7 +92,7 @@ export function anthropicToOpenaiChat(body: AnthropicRequest): OpenAIChatRequest
   }
 
   // thinking → reasoning_effort
-  if (body.thinking && !body.model.toLowerCase().includes('deepseek')) {
+  if (body.thinking) {
     const budget = body.thinking.budget_tokens
     if (budget !== undefined) {
       if (budget <= 1024) result.reasoning_effort = 'low'
@@ -131,11 +140,14 @@ function convertUserMessage(blocks: AnthropicContentBlock[], output: OpenAIChatM
       contentParts.push({ type: 'image_url', image_url: { url } })
     } else if (block.type === 'tool_result') {
       // tool_result → separate tool message
-      const resultContent = typeof block.content === 'string'
+      const rawContent = typeof block.content === 'string'
         ? block.content
         : Array.isArray(block.content)
           ? block.content.filter((b): b is Extract<AnthropicContentBlock, { type: 'text' }> => b.type === 'text').map((b) => b.text).join('\n')
           : ''
+      const resultContent = block.is_error
+        ? `<error>${rawContent}</error>`
+        : rawContent
       output.push({
         role: 'tool',
         tool_call_id: block.tool_use_id,

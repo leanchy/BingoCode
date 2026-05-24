@@ -43,6 +43,7 @@ export type OpenAIChatRequest = {
   max_completion_tokens?: number
   temperature?: number
   top_p?: number
+  frequency_penalty?: number
   stop?: string | string[]
   stream?: boolean
   tools?: OpenAITool[]
@@ -113,6 +114,7 @@ export type OpenAIResponsesRequest = {
   max_output_tokens?: number
   temperature?: number
   top_p?: number
+  frequency_penalty?: number
   stream?: boolean
   tools?: OpenAITool[]
   tool_choice?: unknown

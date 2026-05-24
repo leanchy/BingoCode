@@ -59,6 +59,9 @@ type StreamState = {
   // Holding pattern: hold message_delta until usage arrives
   // (some providers send finish_reason and usage in separate chunks)
   heldMessageDelta: SseEvent | null
+
+  // Accumulated input token count from upstream usage chunks
+  inputTokens: number
 }
 
 // ─── Helpers ───────────────────────────────────────────────
@@ -81,6 +84,7 @@ function createState(model: string): StreamState {
     messageDeltaSent: false,
     messageStopSent: false,
     heldMessageDelta: null,
+    inputTokens: 0,
   }
 }
 
@@ -138,6 +142,14 @@ export function openaiChatStreamToAnthropic(
         }
       } catch (err) {
         errored = true
+        // Emit Anthropic-format error event before closing the stream
+        const errMsg = err instanceof Error ? err.message : String(err)
+        try {
+          controller.enqueue(encoder.encode(formatSse('error', {
+            type: 'error',
+            error: { type: 'api_error', message: `[Bingo Proxy] Stream error: ${errMsg}` },
+          })))
+        } catch { /* controller may already be closed */ }
         controller.error(err)
       } finally {
         if (!errored) {
@@ -464,9 +476,13 @@ function handleFinishReason(
   closeAllOpenBlocks(state)
 
   const stopReason = mapFinishReason(finishReason)
+
+  // Capture input_tokens if available in this chunk
+  if (chunk.usage?.prompt_tokens != null) state.inputTokens = chunk.usage.prompt_tokens
+
   const usage = chunk.usage
-    ? { output_tokens: chunk.usage.completion_tokens || 0 }
-    : { output_tokens: 0 }
+    ? { input_tokens: chunk.usage.prompt_tokens || 0, output_tokens: chunk.usage.completion_tokens || 0 }
+    : { input_tokens: state.inputTokens, output_tokens: 0 }
 
   const messageDelta: SseEvent = {
     event: 'message_delta',
@@ -493,8 +509,9 @@ function mergeUsageIntoHeldDelta(
 ): void {
   if (!state.heldMessageDelta) return
 
+  if (usage.prompt_tokens != null) state.inputTokens = usage.prompt_tokens
   const data = state.heldMessageDelta.data as Record<string, unknown>
-  data.usage = { output_tokens: usage.completion_tokens || 0 }
+  data.usage = { input_tokens: state.inputTokens, output_tokens: usage.completion_tokens || 0 }
   state.messageDeltaSent = true
   state.queue.push(state.heldMessageDelta)
   state.heldMessageDelta = null

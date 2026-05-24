@@ -746,7 +746,7 @@ export function normalizeMessages(messages: Message[]): NormalizedMessage[] {
   // This flag is set to true once we encounter a message with multiple content blocks,
   // and remains true for all subsequent messages in the normalization process.
   let isNewChain = false
-  return messages.flatMap(message => {
+  const raw = messages.flatMap(message => {
     switch (message.type) {
       case 'assistant': {
         isNewChain = isNewChain || message.message.content.length > 1
@@ -820,6 +820,14 @@ export function normalizeMessages(messages: Message[]): NormalizedMessage[] {
       }
     }
   })
+  // Dedup: keep only the last occurrence of each uuid.
+  // Prevents repeated assistant text blocks when the same normalized message
+  // is pushed multiple times during a tool-use loop.
+  const seen = new Map<string, number>()
+  for (let i = 0; i < raw.length; i++) {
+    seen.set(raw[i]!.uuid, i)
+  }
+  return raw.filter((_, i) => seen.get(raw[i]!.uuid) === i)
 }
 
 type ToolUseRequestMessage = NormalizedAssistantMessage & {
@@ -2995,6 +3003,10 @@ export function handleMessageFromStream(
   if (message.event.type === 'message_stop') {
     onSetStreamMode('tool-use')
     onStreamingToolUses(() => [])
+    // Clear streaming text at message_stop so the SDK's async assembly of the
+    // final assistant message does not produce a render frame where both
+    // streamingText (residual) and renderableMessages (final) show the same text.
+    onStreamingText?.(() => null)
     return
   }
 
@@ -3084,6 +3096,10 @@ export function handleMessageFromStream(
           return
       }
     case 'content_block_stop':
+      // Clear streaming text when a content block ends so there is no residual
+      // render frame between this block's stop and the next block's start
+      // (e.g. text block → tool_use block in the same message).
+      onStreamingText?.(() => null)
       return
     case 'message_delta':
       onSetStreamMode('responding')

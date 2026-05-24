@@ -90,6 +90,14 @@ export function openaiResponsesStreamToAnthropic(
           }
         }
       } catch (err) {
+        // Emit Anthropic-format error event before closing the stream
+        const errMsg = err instanceof Error ? err.message : String(err)
+        try {
+          controller.enqueue(encoder.encode(formatSse('error', {
+            type: 'error',
+            error: { type: 'api_error', message: `[Bingo Proxy] Stream error: ${errMsg}` },
+          })))
+        } catch { /* controller may already be closed */ }
         controller.error(err)
         return // don't call close() after error()
       }
@@ -265,7 +273,7 @@ function processEvent(
       controller.enqueue(encoder.encode(formatSse('message_delta', {
         type: 'message_delta',
         delta: { stop_reason: stopReason, stop_sequence: null },
-        usage: { output_tokens: usage?.output_tokens ?? 0 },
+        usage: { input_tokens: usage?.input_tokens ?? 0, output_tokens: usage?.output_tokens ?? 0 },
       })))
       if (!state.messageStopped) {
         state.messageStopped = true

@@ -242,7 +242,9 @@ export type GlobalConfig = {
   hasUsedBackgroundTask?: boolean // Whether the user has backgrounded a task (Ctrl+B)
   queuedCommandUpHintCount?: number // Counter for how many times the user has seen the queued command up hint
   diffTool?: DiffTool // Which tool to use for displaying diffs (terminal or vscode)
-  language: 'en' | 'zh' // User's preferred language for CLI menus
+  language: 'en' | 'zh' | 'ja' // User's preferred language for CLI menus
+  uiAnimEnabled: boolean // Whether top logo animation is enabled in CLI menu
+  uiTipsEnabled: boolean // Whether tips display is enabled in CLI menu
 
   // Terminal setup state tracking
   iterm2SetupInProgress?: boolean
@@ -621,6 +623,8 @@ function createDefaultGlobalConfig(): GlobalConfig {
     respectGitignore: true,
     copyFullResponse: false,
     language: 'en',
+    uiAnimEnabled: true,
+    uiTipsEnabled: true,
   }
 }
 
@@ -666,6 +670,8 @@ export const GLOBAL_CONFIG_KEYS = [
   'remoteControlAtStartup',
   'remoteDialogSeen',
   'language',
+  'uiAnimEnabled',
+  'uiTipsEnabled',
 ] as const
 
 export type GlobalConfigKey = (typeof GLOBAL_CONFIG_KEYS)[number]

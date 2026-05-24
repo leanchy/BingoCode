@@ -197,6 +197,7 @@ const PROACTIVE_FALSE = () => false;
 const SUGGEST_BG_PR_NOOP = (_p: string, _n: string): boolean => false;
 const useProactive = feature('PROACTIVE') || feature('KAIROS') ? require('../proactive/useProactive.js').useProactive : null;
 const useScheduledTasks = feature('AGENT_TRIGGERS') ? require('../hooks/useScheduledTasks.js').useScheduledTasks : null;
+const useGoalEvaluator = require('../hooks/useGoalEvaluator.js').useGoalEvaluator
 /* eslint-enable @typescript-eslint/no-require-imports */
 import { isAgentSwarmsEnabled } from '../utils/agentSwarmsEnabled.js';
 import { useTaskListWatcher } from '../hooks/useTaskListWatcher.js';
@@ -3887,6 +3888,11 @@ export function REPL({
     executeQueuedInput,
     hasActiveLocalJsxUI: isShowingLocalJSXCommand,
     queryGuard
+  });
+  useGoalEvaluator({
+    lastQueryCompletionTime,
+    messagesRef,
+    isQueryActive,
   });
 
   // We'll use the global lastInteractionTime from state.ts

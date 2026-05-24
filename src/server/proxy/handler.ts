@@ -28,6 +28,9 @@ import { homedir } from 'node:os'
 
 const providerService = new ProviderService()
 
+// Stream timeout: configurable via BINGO_STREAM_TIMEOUT_MS, default 300s
+const STREAM_TIMEOUT_MS = parseInt(process.env.BINGO_STREAM_TIMEOUT_MS ?? '300000', 10) || 300_000
+
 async function logToFile(message: string) {
   // Disabled log output for production
 }
@@ -108,6 +111,7 @@ export async function handleProxyRequest(req: Request, url: URL): Promise<Respon
   }
 
   const isStream = body.stream === true
+  const betaHeader = req.headers.get('anthropic-beta')
 
   // --- Slot-based routing ---
   const slot = await identifySlot(body.model ?? '')
@@ -123,7 +127,7 @@ export async function handleProxyRequest(req: Request, url: URL): Promise<Respon
 
     try {
       if (slotConfig.apiFormat === 'anthropic') {
-        return await handleAnthropicPassthrough(proxiedBody, baseUrl, slotConfig.apiKey, isStream, uiLabel)
+        return await handleAnthropicPassthrough(proxiedBody, baseUrl, slotConfig.apiKey, isStream, uiLabel, betaHeader)
       } else if (slotConfig.apiFormat === 'openai_chat') {
         return await handleOpenaiChat(proxiedBody, baseUrl, slotConfig.apiKey, isStream, uiLabel)
       } else {
@@ -170,17 +174,21 @@ async function handleAnthropicPassthrough(
   apiKey: string,
   isStream: boolean,
   uiLabel: string | null = null,
+  betaHeader: string | null = null,
 ): Promise<Response> {
   const url = `${baseUrl}/v1/messages`
+  const upstreamHeaders: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'x-api-key': apiKey,
+    'anthropic-version': '2023-06-01',
+  }
+  if (betaHeader) upstreamHeaders['anthropic-beta'] = betaHeader
+
   const upstream = await fetch(url, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-    },
+    headers: upstreamHeaders,
     body: JSON.stringify(body),
-    signal: isStream ? AbortSignal.timeout(30_000) : AbortSignal.timeout(300_000),
+    signal: isStream ? AbortSignal.timeout(STREAM_TIMEOUT_MS) : AbortSignal.timeout(300_000),
   })
 
   if (!upstream.ok) {
@@ -196,7 +204,9 @@ async function handleAnthropicPassthrough(
     return new Response(upstream.body, {
       status: 200,
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        Connection: 'keep-alive',
       },
     })
   }
@@ -222,7 +232,7 @@ async function handleOpenaiChat(
     method: 'POST',
     headers: buildUpstreamHeaders(apiKey),
     body: JSON.stringify(transformed),
-    signal: isStream ? AbortSignal.timeout(30_000) : AbortSignal.timeout(300_000),
+    signal: isStream ? AbortSignal.timeout(STREAM_TIMEOUT_MS) : AbortSignal.timeout(300_000),
   })
 
   if (!upstream.ok) {
@@ -273,7 +283,7 @@ async function handleOpenaiResponses(
     method: 'POST',
     headers: buildUpstreamHeaders(apiKey),
     body: JSON.stringify(transformed),
-    signal: isStream ? AbortSignal.timeout(30_000) : AbortSignal.timeout(300_000),
+    signal: isStream ? AbortSignal.timeout(STREAM_TIMEOUT_MS) : AbortSignal.timeout(300_000),
   })
 
   if (!upstream.ok) {

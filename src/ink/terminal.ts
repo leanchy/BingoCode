@@ -173,8 +173,14 @@ export function supportsExtendedKeys(): boolean {
  *  SetConsoleCursorPosition follows the cursor into scrollback
  *  (microsoft/terminal#14774), yanking users to the top of their buffer
  *  mid-stream. WT_SESSION catches WSL-in-Windows-Terminal where platform
- *  is linux but output still routes through conhost. */
+ *  is linux but output still routes through conhost.
+ *
+ *  xterm.js (VS Code, Cursor, Windsurf integrated terminals) does NOT have
+ *  this bug — cursor-up (CSI A) clamps at viewport top without yanking into
+ *  scrollback. Even when WT_SESSION is set (e.g. VS Code running inside
+ *  Windows Terminal), the actual pty renderer is xterm.js, so we exempt it. */
 export function hasCursorUpViewportYankBug(): boolean {
+  if (isXtermJs()) return false
   return process.platform === 'win32' || !!process.env.WT_SESSION
 }
 
