@@ -84,5 +84,8 @@ npm install -g bingocode
 *   `bingo` : 服务端 (Service)
 *   `bingocode/claude` : 聊天窗 (Chat)
 
+离线部署：下载Releases版本进行离线npm安装即可
+
+
 ---
 *Ref: [github.com/NanmiCoder/cc-haha](https://github.com/NanmiCoder/cc-haha)*
