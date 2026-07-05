@@ -1,4 +1,4 @@
-import { c as _c } from "react/compiler-runtime";
+﻿import { c as _c } from "react/compiler-runtime";
 import { feature } from 'bun:bundle';
 import chalk from 'chalk';
 import React from 'react';
@@ -22,7 +22,7 @@ function stringsForDecisionReason(reason: PermissionDecisionReason | undefined, 
   if (!reason) {
     return null;
   }
-  if ((feature('BASH_CLASSIFIER') || feature('TRANSCRIPT_CLASSIFIER')) && reason.type === 'classifier') {
+  if ((true || true) && reason.type === 'classifier') {
     if (reason.classifier === 'auto-mode') {
       return {
         reasonString: `Auto mode classifier requires confirmation for this ${toolType}.\n${reason.reason}`,

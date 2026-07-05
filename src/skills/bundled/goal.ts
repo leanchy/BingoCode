@@ -59,10 +59,18 @@ export function registerGoalSkill(): void {
 
 Goal condition: "${trimmed}"
 
-This goal is now registered for this session. An independent evaluator model will check after each turn whether the goal is satisfied. Maximum ${maxIter} iterations.
+This goal is now registered for this session. After each turn, an independent evaluator (Haiku 4.5, a weak model) will check whether the goal is satisfied. Maximum ${maxIter} iterations.
+
+CRITICAL: The evaluator reads ONLY your text output. It cannot see code changes, tool results, or file contents — only the plain text you write.
+
+	At each turn toward the goal, output a short evaluation block like:
+	EVAL: [metric1]: [value] / [target] → ✓ or ✗
+
+	This block is the ONLY signal the evaluator can reliably process. Make it short,
+	unambiguous, and quantitative. Do NOT expect the evaluator to infer success from narrative discussion.
+	Note: The EVAL block can appear anywhere in your text response (not just in quote blocks).
 
 Tell the user: Goal set — you will work autonomously until "${trimmed}" is achieved (max ${maxIter} turns). Send \`/goal clear\` to cancel.
-
 Now begin: assess current state and take the first concrete action toward the goal.`,
         },
       ]

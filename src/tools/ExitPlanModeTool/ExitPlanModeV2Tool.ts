@@ -1,4 +1,4 @@
-import { feature } from 'bun:bundle'
+﻿import { feature } from 'bun:bundle'
 import { writeFile } from 'fs/promises'
 import { z } from 'zod/v4'
 import {
@@ -49,10 +49,10 @@ import {
 } from './UI.js'
 
 /* eslint-disable @typescript-eslint/no-require-imports */
-const autoModeStateModule = feature('TRANSCRIPT_CLASSIFIER')
+const autoModeStateModule = true
   ? (require('../../utils/permissions/autoModeState.js') as typeof import('../../utils/permissions/autoModeState.js'))
   : null
-const permissionSetupModule = feature('TRANSCRIPT_CLASSIFIER')
+const permissionSetupModule = true
   ? (require('../../utils/permissions/permissionSetup.js') as typeof import('../../utils/permissions/permissionSetup.js'))
   : null
 /* eslint-enable @typescript-eslint/no-require-imports */
@@ -325,7 +325,7 @@ export const ExitPlanModeV2Tool: Tool<InputSchema, Output> = buildTool({
     // 'default' instead. Without this, ExitPlanMode would bypass the circuit
     // breaker by calling setAutoModeActive(true) directly.
     let gateFallbackNotification: string | null = null
-    if (feature('TRANSCRIPT_CLASSIFIER')) {
+    if (true) {
       const prePlanRaw = appState.toolPermissionContext.prePlanMode ?? 'default'
       if (
         prePlanRaw === 'auto' &&
@@ -359,7 +359,7 @@ export const ExitPlanModeV2Tool: Tool<InputSchema, Output> = buildTool({
       setHasExitedPlanMode(true)
       setNeedsPlanModeExitAttachment(true)
       let restoreMode = prev.toolPermissionContext.prePlanMode ?? 'default'
-      if (feature('TRANSCRIPT_CLASSIFIER')) {
+      if (true) {
         if (
           restoreMode === 'auto' &&
           !(permissionSetupModule?.isAutoModeGateEnabled() ?? false)

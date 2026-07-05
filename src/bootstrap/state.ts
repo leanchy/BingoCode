@@ -139,6 +139,11 @@ type State = {
   goalCondition: string | null
   goalIterationCount: number
   goalMaxIterations: number
+  // Goal evaluator history for detecting repeated gaps
+  goalEvalHistory: {
+    lastGap: string | null
+    consecutiveSameGapCount: number
+  }
   // Session-only cron tasks created via CronCreate with durable: false.
   // Fire on schedule like file-backed tasks but are never written to
   // .claude/scheduled_tasks.json — they die with the process. Typed via
@@ -365,6 +370,10 @@ function getInitialState(): State {
     goalCondition: null,
     goalIterationCount: 0,
     goalMaxIterations: 20,
+    goalEvalHistory: {
+      lastGap: null,
+      consecutiveSameGapCount: 0,
+    },
     sessionCronTasks: [],
     sessionCreatedTeams: new Set(),
     // Session-only trust flag (not persisted to disk)
@@ -1803,5 +1812,19 @@ export function incrementGoalIterationCount(): void {
 
 export function getGoalMaxIterations(): number {
   return STATE.goalMaxIterations
+}
+
+// Goal evaluator history accessors
+export function getGoalEvalHistory() {
+  return STATE.goalEvalHistory
+}
+
+export function updateGoalEvalHistory(lastGap: string | null): void {
+  if (lastGap === STATE.goalEvalHistory.lastGap) {
+    STATE.goalEvalHistory.consecutiveSameGapCount++
+  } else {
+    STATE.goalEvalHistory.lastGap = lastGap
+    STATE.goalEvalHistory.consecutiveSameGapCount = 1
+  }
 }
 

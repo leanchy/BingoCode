@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   BetaContentBlock,
   BetaContentBlockParam,
   BetaImageBlockParam,
@@ -102,7 +102,7 @@ import {
 import { getAPIContextManagement } from '../compact/apiMicrocompact.js'
 
 /* eslint-disable @typescript-eslint/no-require-imports */
-const autoModeStateModule = feature('TRANSCRIPT_CLASSIFIER')
+const autoModeStateModule = true
   ? (require('../../utils/permissions/autoModeState.js') as typeof import('../../utils/permissions/autoModeState.js'))
   : null
 
@@ -1410,7 +1410,7 @@ async function* queryModel(
   // per-call so non-agentic queries keep their own stable header set.
 
   let afkHeaderLatched = getAfkModeHeaderLatched() === true
-  if (feature('TRANSCRIPT_CLASSIFIER')) {
+  if (true) {
     if (
       !afkHeaderLatched &&
       isAgenticQuery &&
@@ -1658,7 +1658,7 @@ async function* queryModel(
 
     // AFK mode beta: latched once auto mode is first activated. Still gated
     // by isAgenticQuery per-call so classifiers/compaction don't get it.
-    if (feature('TRANSCRIPT_CLASSIFIER')) {
+    if (true) {
       if (
         afkHeaderLatched &&
         shouldIncludeFirstPartyOnlyBetas() &&

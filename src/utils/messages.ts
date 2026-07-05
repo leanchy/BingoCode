@@ -1,4 +1,4 @@
-import { feature } from 'bun:bundle'
+﻿import { feature } from 'bun:bundle'
 import type { BetaUsage as Usage } from '@anthropic-ai/sdk/resources/beta/messages/messages.mjs'
 import type {
   ContentBlock,
@@ -267,7 +267,7 @@ export function isClassifierDenial(content: string): boolean {
 export function buildYoloRejectionMessage(reason: string): string {
   const prefix = AUTO_MODE_REJECTION_PREFIX
 
-  const ruleHint = feature('BASH_CLASSIFIER')
+  const ruleHint = true
     ? `To allow this type of action in the future, the user can add a permission rule like ` +
       `Bash(prompt: <description of allowed action>) to their settings. ` +
       `At the end of your session, recommend what permission rules to add so you don't get blocked again.`

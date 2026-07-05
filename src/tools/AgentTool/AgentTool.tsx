@@ -1,4 +1,4 @@
-import { feature } from 'bun:bundle';
+﻿import { feature } from 'bun:bundle';
 import * as React from 'react';
 import { buildTool, type ToolDef, toolMatchesName } from 'src/Tool.js';
 import type { Message as MessageType, NormalizedUserMessage } from 'src/types/message.js';
@@ -958,7 +958,7 @@ export const AgentTool = buildTool({
 
                     // Extract text from agent result content for the notification
                     let finalMessage = extractTextContent(agentResult.content, '\n');
-                    if (feature('TRANSCRIPT_CLASSIFIER')) {
+                    if (true) {
                       const backgroundedAppState = toolUseContext.getAppState();
                       const handoffWarning = await classifyHandoffIfNeeded({
                         agentMessages,
@@ -1233,7 +1233,7 @@ export const AgentTool = buildTool({
           logForDebugging(`Sync agent recovering from error with ${agentMessages.length} messages`);
         }
         const agentResult = finalizeAgentTool(agentMessages, syncAgentId, metadata);
-        if (feature('TRANSCRIPT_CLASSIFIER')) {
+        if (true) {
           const currentAppState = toolUseContext.getAppState();
           const handoffWarning = await classifyHandoffIfNeeded({
             agentMessages,

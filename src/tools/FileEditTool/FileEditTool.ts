@@ -72,8 +72,11 @@ import {
 import {
   areFileEditsInputsEquivalent,
   findActualString,
+  findClosestLines,
+  findFuzzySuggestion,
   getPatchForEdit,
   preserveQuoteStyle,
+  visibleWhitespace,
 } from './utils.js'
 
 // V8/Bun string length limit is ~2^30 characters (~1 billion). For typical
@@ -315,10 +318,19 @@ export const FileEditTool = buildTool({
     // Use findActualString to handle quote normalization
     const actualOldString = findActualString(file, old_string)
     if (!actualOldString) {
+const BASE = 'String to replace not found.'
+      const matches = findClosestLines(file, old_string)
+      const fuzzy = findFuzzySuggestion(file, old_string)
+      const fuzzyBlock = fuzzy
+        ? `\n\nDid you mean:\n  line ${fuzzy.lineNumber}: ${visibleWhitespace(fuzzy.suggestion)}\n  (edit distance ${fuzzy.distance})`
+        : ''
+      const msg = matches.length
+        ? `${BASE}\n→ = tab · = space\nProvided:\n${visibleWhitespace(old_string)}\nClosest matches:\n${matches.map(m => `  line ${m.lineNumber} (${m.diffType})\n    ${visibleWhitespace(m.snippet)}`).join('\n')}${fuzzyBlock}\n↑ check visible whitespace markers above.`
+        : `${BASE}.\n→ = tab · = space\nProvided:\n${visibleWhitespace(old_string)}${fuzzyBlock}\n↑ check visible whitespace markers above.`
       return {
         result: false,
         behavior: 'ask',
-        message: `String to replace not found in file.\nString: ${old_string}`,
+        message: msg,
         meta: {
           isFilePathAbsolute: String(isAbsolute(file_path)),
         },
@@ -357,6 +369,17 @@ export const FileEditTool = buildTool({
     if (settingsValidationResult !== null) {
       return settingsValidationResult
     }
+
+    // Refresh the read timestamp to prevent TOCTOU races between validateInput
+    // and call(). On Windows, antivirus/cloud-sync/linters can bump mtime between
+    // these two reads without changing content. Storing a fresh timestamp here
+    // prevents a false positive in call()'s second mtime check.
+    toolUseContext.readFileState.set(fullFilePath, {
+      content: fileContent,
+      timestamp: getFileModificationTime(fullFilePath),
+      offset: undefined,
+      limit: undefined,
+    })
 
     return { result: true, meta: { actualOldString } }
   },
@@ -467,9 +490,23 @@ export const FileEditTool = buildTool({
       }
     }
 
-    // 3. Use findActualString to handle quote normalization
+    // 3. Use findActualString to handle quote normalization.
+    // validateInput already verified this matches in the file. If it returns null
+    // now, the file content changed between reads — fall back to raw old_string
+    // only when it is a literal substring, otherwise throw.
     const actualOldString =
-      findActualString(originalFileContents, old_string) || old_string
+      findActualString(originalFileContents, old_string) ??
+      (originalFileContents.includes(old_string) ? old_string : null)
+    if (!actualOldString) {
+      throw new EditNotFoundError(
+        'String to replace not found in file.',
+        {
+          searchString: old_string,
+          visibleSearch: visibleWhitespace(old_string),
+          closestMatches: findClosestLines(originalFileContents, old_string),
+        },
+      )
+    }
 
     // Preserve curly quotes in new_string when the file uses them
     const actualNewString = preserveQuoteStyle(

@@ -1,4 +1,4 @@
-import { c as _c } from "react/compiler-runtime";
+﻿import { c as _c } from "react/compiler-runtime";
 import { feature } from 'bun:bundle';
 import * as React from 'react';
 import { resetCostState } from '../../bootstrap/state.js';
@@ -44,7 +44,7 @@ export async function call(onDone: LocalJSXCommandOnDone, context: LocalJSXComma
       resetBypassPermissionsCheck();
       const appState = context.getAppState();
       void checkAndDisableBypassPermissionsIfNeeded(appState.toolPermissionContext, context.setAppState);
-      if (feature('TRANSCRIPT_CLASSIFIER')) {
+      if (true) {
         resetAutoModeGateCheck();
         void checkAndDisableAutoModeIfNeeded(appState.toolPermissionContext, context.setAppState, appState.fastMode);
       }

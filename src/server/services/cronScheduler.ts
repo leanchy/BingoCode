@@ -413,7 +413,7 @@ export class CronScheduler {
 
     const proc = Bun.spawn(
       [
-        'bun',
+        process.execPath,
         '--preload',
         preloadPath,
         cliPath,

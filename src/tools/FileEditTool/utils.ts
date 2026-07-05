@@ -15,6 +15,109 @@ import {
 } from '../../utils/file.js'
 import type { EditInput, FileEdit } from './types.js'
 
+/**
+ * Computes Levenshtein distance between two strings using Wagner-Fischer DP.
+ * O(n*m) time, O(min(n,m)) space (two-row optimization).
+ */
+export function levenshteinDistance(a: string, b: string): number {
+  // Ensure a is the shorter string for memory efficiency
+  if (a.length > b.length) {
+    ;[a, b] = [b, a]
+  }
+  const m = a.length
+  const n = b.length
+
+  let prevRow = new Uint16Array(m + 1)
+  let currRow = new Uint16Array(m + 1)
+
+  for (let i = 0; i <= m; i++) prevRow[i] = i
+  for (let j = 1; j <= n; j++) {
+    currRow[0] = j
+    for (let i = 1; i <= m; i++) {
+      const cost = a.charCodeAt(i - 1) === b.charCodeAt(j - 1) ? 0 : 1
+      // d[i][j] = min(d[i-1][j]+1, d[i][j-1]+1, d[i-1][j-1]+cost)
+      //   deletion: remove char from s → d[i-1][j] + 1 → currRow[i - 1] + 1
+      //   insertion: add char from t → d[i][j-1] + 1 → prevRow[i] + 1
+      //   substitution: swap or match → d[i-1][j-1] + cost → prevRow[i - 1] + cost
+      currRow[i] = Math.min(
+        currRow[i - 1]! + 1,
+        prevRow[i]! + 1,
+        prevRow[i - 1]! + cost,
+      )
+    }
+    ;[prevRow, currRow] = [currRow, prevRow]
+  }
+  return prevRow[m]!
+}
+
+/**
+ * Fuzzy matching — finds the best match in fileContent for searchString
+ * when the edit distance is within threshold.  Used as a secondary pass
+ * after exact/normalized matching fails, to suggest "Did you mean: X"
+ * when the model's old_string is only a few characters off.
+ *
+ * For multi-line search strings: compares each contiguous block of lines
+ * whose total length is within tolerance.  Returns null when no match is
+ * within threshold.
+ */
+export function findFuzzySuggestion(
+  fileContent: string,
+  searchString: string,
+  threshold: number = 2,
+): { suggestion: string; lineNumber: number; distance: number } | null {
+  const searchLines = searchString.split('\n')
+  const fileLines = fileContent.split('\n')
+  const searchLen = searchString.length
+
+  // For single-line searches, scan all lines with similar length
+  if (searchLines.length === 1) {
+    const lenTolerance = searchLen + threshold * 2
+    let bestLine: string | null = null
+    let bestDist = Infinity
+    let bestIdx = -1
+
+    for (let i = 0; i < fileLines.length; i++) {
+      const line = fileLines[i]!
+      if (Math.abs(line.length - searchLen) > lenTolerance) continue
+      const dist = levenshteinDistance(line, searchString)
+      if (dist < bestDist) {
+        bestDist = dist
+        bestLine = line
+        bestIdx = i
+      }
+    }
+
+    if (bestLine && bestDist > 0 && bestDist <= threshold) {
+      return {
+        suggestion: bestLine.replace(/\s+$/, ''),
+        lineNumber: bestIdx + 1,
+        distance: bestDist,
+      }
+    }
+    // No match within threshold (or distance 0 = exact match already present)
+    return null
+  }
+
+  // Multi-line: compare contiguous blocks of lines
+  const maxBlockLen = searchLen + threshold * searchLines.length
+  let best: { suggestion: string; lineNumber: number; distance: number } | null = null
+
+  for (let i = 0; i <= fileLines.length - searchLines.length; i++) {
+    const block = fileLines.slice(i, i + searchLines.length).join('\n')
+    if (Math.abs(block.length - searchLen) > maxBlockLen) continue
+    const dist = levenshteinDistance(block.replace(/\s+$/, ''), searchString.replace(/\s+$/, ''))
+    if (dist > 0 && dist <= threshold && dist < (best?.distance ?? Infinity)) {
+      best = {
+        suggestion: block.replace(/\s+$/, ''),
+        lineNumber: i + 1,
+        distance: dist,
+      }
+    }
+  }
+
+  return best
+}
+
 // Claude can't output curly quotes, so we define them as constants here for Claude to use
 // in the code. We do this because we normalize curly quotes to straight quotes
 // when applying edits.
@@ -70,6 +173,16 @@ export function stripTrailingWhitespace(str: string): string {
  * @param searchString The string to search for
  * @returns The actual string found in the file, or null if not found
  */
+
+/** Normalizes Unicode dashes to ASCII, indent whitespace to spaces.
+ * Fills gaps where models emit ASCII dashes instead of Unicode dashes,
+ * or provide different tab/space indentation than the file has. */
+export function normalizeDashes(str: string): string {
+  return str.replaceAll('\u2014', '-').replaceAll('\u2013', '-').replaceAll('\u2015', '-')
+}
+export function normalizeIndentation(str: string): string {
+  return str.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n').map(line => line.replace(/^[\t ]+/, '')).join('\n')
+}
 export function findActualString(
   fileContent: string,
   searchString: string,
@@ -82,11 +195,40 @@ export function findActualString(
   // Try with normalized quotes
   const normalizedSearch = normalizeQuotes(searchString)
   const normalizedFile = normalizeQuotes(fileContent)
-
   const searchIndex = normalizedFile.indexOf(normalizedSearch)
   if (searchIndex !== -1) {
-    // Find the actual string in the file that matches
     return fileContent.substring(searchIndex, searchIndex + searchString.length)
+  }
+
+  // Try with normalized dashes (em-dash, en-dash -> ASCII dash)
+  const dashedSearch = normalizeDashes(searchString)
+  const dashedFile = normalizeDashes(fileContent)
+  const dashIndex = dashedFile.indexOf(dashedSearch)
+  if (dashIndex !== -1) {
+    return fileContent.substring(dashIndex, dashIndex + searchString.length)
+  }
+
+  // Try with normalized leading whitespace (tab <-> space)
+  const indentNormalizedSearch = normalizeIndentation(searchString)
+  const indentTrimmedFile = normalizeIndentation(fileContent)
+  const matchPoint = indentTrimmedFile.indexOf(indentNormalizedSearch)
+  if (matchPoint !== -1) {
+    // Leading whitespace normalization is NOT length-preserving,
+    // so compute bounds by matching each trimmed line back to its original.
+    const origLines = fileContent.split('\n')
+    const trimmedLines = indentTrimmedFile.split('\n')
+    const searchLines = indentNormalizedSearch.split('\n')
+    for (let i = 0; i <= trimmedLines.length - searchLines.length; i++) {
+      let k = 0
+      while (k < searchLines.length && trimmedLines[i + k] === searchLines[k]) k++
+      if (k !== searchLines.length) continue
+      let start = 0
+      for (let j = 0; j < i; j++) start += origLines[j].length + 1
+      let end = start
+      for (let j = i; j < i + k; j++) end += origLines[j].length + 1
+      return fileContent.substring(start, Math.max(start, end - 1))
+    }
+    return null
   }
 
   return null
@@ -196,6 +338,79 @@ function applyCurlySingleQuotes(str: string): string {
     }
   }
   return result.join('')
+}
+
+/**
+ * Error class for when an edit's old_string can't be found in the file.
+ * Carries diagnostics for better error reporting.
+ */
+export class EditNotFoundError extends Error {
+  diagnostics: {
+    searchString: string
+    visibleSearch: string
+    closestMatches: {
+      snippet: string
+      lineNumber: number
+      diffType: string
+    }[]
+  }
+  constructor(
+    message: string,
+    diagnostics: EditNotFoundError['diagnostics'],
+  ) {
+    super(message)
+    this.name = 'EditNotFoundError'
+    this.diagnostics = diagnostics
+  }
+}
+
+/**
+ * Renders whitespace characters as visible Unicode equivalents:
+ * tab → '→', space → '·'
+ */
+export function visibleWhitespace(str: string): string {
+  return str
+    .replace(/\t/g, '→')
+    .replace(/ /g, '·')
+    .replace(/\n/g, '↵')
+    .replace(/\r/g, '␍')
+}
+
+/**
+ * Finds up to 3 lines in fileContent whose content (non-whitespace portion)
+ * matches the content of the first line of searchString.
+ * Used for diagnostic purposes when findActualString returns null.
+ *
+ * Returns matches sorted with whitespace-diff first, then content matches.
+ */
+export function findClosestLines(
+  fileContent: string,
+  searchString: string,
+): { snippet: string; lineNumber: number; diffType: string }[] {
+  const firstContent = searchString.split('\n')[0]!.replace(/^\s+/, '')
+  if (!firstContent) return []
+
+  const matches: { snippet: string; lineNumber: number; diffType: string }[] = []
+  const fileLines = fileContent.split('\n')
+
+  for (let i = 0; i < fileLines.length; i++) {
+    const line = fileLines[i]!
+    if (line.replace(/^\s+/, '') !== firstContent) continue
+
+    const snippet = line.replace(/\s+$/, '')
+
+    // Avoid duplicates
+    if (!matches.some(m => m.snippet === snippet)) {
+      matches.push({
+        snippet,
+        lineNumber: i + 1,
+        diffType: 'content match',
+      })
+      if (matches.length >= 3) break
+    }
+  }
+
+  return matches
 }
 
 /**
@@ -323,7 +538,22 @@ export function getPatchForEdits({
 
     // If this edit didn't change anything, throw an error
     if (updatedFile === previousContent) {
-      throw new Error('String not found in file. Failed to apply edit.')
+      const closest = findClosestLines(fileContents, edit.old_string)
+      const fuzzy = findFuzzySuggestion(fileContents, edit.old_string)
+      const fuzzyBlock = fuzzy
+        ? `\n\nDid you mean:\n  line ${fuzzy.lineNumber}: ${visibleWhitespace(fuzzy.suggestion)}\n  (edit distance ${fuzzy.distance})`
+        : ''
+      throw new EditNotFoundError(
+        closest.length
+          ? `Edit failed — closest match:
+${closest.map(m => `  line ${m.lineNumber}: ${visibleWhitespace(m.snippet)} (${m.diffType})`).join('\n')}${fuzzyBlock}`
+          : `Edit failed — string not found in file.${fuzzyBlock}`,
+        {
+          searchString: edit.old_string,
+          visibleSearch: visibleWhitespace(edit.old_string),
+          closestMatches: closest,
+        },
+      )
     }
 
     // Track the new string that was applied

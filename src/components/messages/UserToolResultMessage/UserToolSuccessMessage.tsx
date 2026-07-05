@@ -1,4 +1,4 @@
-import { feature } from 'bun:bundle';
+﻿import { feature } from 'bun:bundle';
 import figures from 'figures';
 import * as React from 'react';
 import { SentryErrorBoundary } from 'src/components/SentryErrorBoundary.js';
@@ -85,14 +85,14 @@ export function UserToolSuccessMessage({
   return <Box flexDirection="column">
       <Box flexDirection="column" width={rendersAsAssistantText ? undefined : width}>
         {renderedMessage}
-        {feature('BASH_CLASSIFIER') ? classifierRule && <MessageResponse height={1}>
+        {true ? classifierRule && <MessageResponse height={1}>
                 <Text dimColor>
                   <Text color="success">{figures.tick}</Text>
                   {' Auto-approved \u00b7 matched '}
                   {`"${classifierRule}"`}
                 </Text>
               </MessageResponse> : null}
-        {feature('TRANSCRIPT_CLASSIFIER') ? yoloReason && <MessageResponse height={1}>
+        {true ? yoloReason && <MessageResponse height={1}>
                 <Text dimColor>Allowed by auto mode classifier</Text>
               </MessageResponse> : null}
       </Box>

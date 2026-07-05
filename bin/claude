@@ -19,6 +19,20 @@ fi
 
 cd "$ROOT_DIR"
 
+# ── bun 检测与自动安装 ──
+if ! command -v bun &>/dev/null && [[ ! -x "$HOME/.bun/bin/bun" ]]; then
+  echo "[bingocode] bun 未检测到，正在通过 npm install -g bun 安装..."
+  if npm install -g bun --loglevel error; then
+    echo "[bingocode] bun 安装完成，正在启动..."
+    export PATH="$HOME/.bun/bin:$PATH"
+  else
+    echo "[bingocode] npm install -g bun 失败，请手动安装 bun: https://bun.sh" >&2
+    exit 1
+  fi
+fi
+
+BUN_BIN="$(command -v bun 2>/dev/null || echo "$HOME/.bun/bin/bun")"
+
 # When spawned by the desktop/web server as a child CLI process,
 # skip .env loading — the server has already set the correct env
 # via bingo/settings.json. Loading .env would re-inject stale
@@ -35,8 +49,8 @@ fi
 
 # Force recovery CLI (simple readline REPL, no Ink TUI)
 if [[ "${CLAUDE_CODE_FORCE_RECOVERY_CLI:-0}" == "1" ]]; then
-  exec bun $ENV_FILE_FLAG ./src/localRecoveryCli.ts "$@"
+  exec "$BUN_BIN" $ENV_FILE_FLAG ./src/localRecoveryCli.ts "$@"
 fi
 
 # Default: full CLI with Ink TUI
-exec bun $ENV_FILE_FLAG ./src/entrypoints/cli.tsx "$@"
+exec "$BUN_BIN" $ENV_FILE_FLAG ./src/entrypoints/cli.tsx "$@"

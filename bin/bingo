@@ -20,34 +20,14 @@ cd "$ROOT_DIR"
 
 # ── bun 检测与自动安装 ──
 if ! command -v bun &>/dev/null && [[ ! -x "$HOME/.bun/bin/bun" ]]; then
-  echo "[bingocode] bun 未检测到，正在通过 npm 安装..."
-  _TMP_DIR="$(mktemp -d)"
-  _ARCH="$(uname -m)"
-  if [[ "$_ARCH" == "aarch64" || "$_ARCH" == "arm64" ]]; then
-    _BUN_PKG="@oven/bun-linux-aarch64"
+  echo "[bingocode] bun 未检测到，正在通过 npm install -g bun 安装..."
+  if npm install -g bun --loglevel error; then
+    echo "[bingocode] bun 安装完成，正在启动..."
+    export PATH="$HOME/.bun/bin:$PATH"
   else
-    _BUN_PKG="@oven/bun-linux-x64"
-  fi
-
-  if npm install "$_BUN_PKG" --prefix "$_TMP_DIR" --no-save --loglevel error; then
-    _BUN_SRC="$_TMP_DIR/node_modules/$_BUN_PKG/bin/bun"
-    if [[ -f "$_BUN_SRC" ]]; then
-      mkdir -p "$HOME/.bun/bin"
-      cp "$_BUN_SRC" "$HOME/.bun/bin/bun"
-      chmod +x "$HOME/.bun/bin/bun"
-      export PATH="$HOME/.bun/bin:$PATH"
-      echo "[bingocode] bun 安装完成，正在启动..."
-    else
-      echo "[bingocode] 安装失败：未找到 $_BUN_SRC" >&2
-      rm -rf "$_TMP_DIR"
-      exit 1
-    fi
-  else
-    echo "[bingocode] npm install $_BUN_PKG 失败，请手动安装 bun: https://bun.sh" >&2
-    rm -rf "$_TMP_DIR"
+    echo "[bingocode] npm install -g bun 失败，请手动安装 bun: https://bun.sh" >&2
     exit 1
   fi
-  rm -rf "$_TMP_DIR"
 fi
 
 BUN_BIN="$(command -v bun 2>/dev/null || echo "$HOME/.bun/bin/bun")"

@@ -245,9 +245,13 @@ function closeAllToolBlocks(state: StreamState): void {
 }
 
 function closeAllOpenBlocks(state: StreamState): void {
-  // Close current text/thinking block
-  closeCurrentBlock(state)
-  // Close all tool blocks
+  if (state.currentBlockType !== 'tool_use') {
+    // text/thinking block — close via state machine
+    closeCurrentBlock(state)
+  }
+  // Close all tool blocks via toolBlocks map
+  // (avoids double-stop: if we called closeCurrentBlock above for a tool_use,
+  //  closeAllToolBlocks would re-stop the same index)
   closeAllToolBlocks(state)
 }
 
@@ -440,6 +444,7 @@ function handleToolCalls(delta: DeltaEx, state: StreamState): void {
       block.started = true
       block.anthropicIndex = state.nextContentIndex++
       state.currentBlockType = 'tool_use'
+      state.currentBlockIndex = block.anthropicIndex
       state.blockStartSent = true
       state.blockStopSent = false
 

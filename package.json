@@ -1,6 +1,6 @@
 {
   "name": "bingocode",
-  "version": "1.1.135",
+  "version": "1.1.182",
   "type": "module",
   "bin": {
     "claude": "bin/claude-win.cjs",
@@ -26,7 +26,6 @@
     ".claude/",
     "runtime/",
     "preload.ts",
-    ".env.example",
     "package.json",
     "tsconfig.json",
     "README.md",
@@ -80,6 +79,7 @@
     "lru-cache": "^11.2.7",
     "marked": "^17.0.5",
     "medium-zoom": "^1.1.0",
+    "node-notifier": "^10.0.1",
     "p-map": "^7.0.4",
     "picomatch": "^4.0.4",
     "proper-lockfile": "^4.1.2",
@@ -94,6 +94,7 @@
     "stack-utils": "^2.0.6",
     "strip-ansi": "^7.2.0",
     "supports-hyperlinks": "^4.4.0",
+    "systray2": "^2.1.4",
     "tree-kill": "^1.2.2",
     "ts-node": "^10.9.2",
     "type-fest": "^5.5.0",
@@ -112,11 +113,7 @@
   "devDependencies": {
     "@types/node": "^25.6.0"
   },
-  "description": "<p align=\"center\">   <img src=\"docs/images/logo-horizontal.jpg\" alt=\"Claude Code Haha\" width=\"480\"> </p>",
-  "main": "index.js",
-  "directories": {
-    "doc": "docs"
-  },
+  "description": "BingoCode - AI-powered coding assistant CLI built on Claude",
   "keywords": [],
   "author": "Leanchy",
   "license": "MIT"

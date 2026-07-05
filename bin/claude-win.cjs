@@ -32,11 +32,35 @@ process.env.NoDefaultCurrentDirectoryInExePath = '1';
   }
 })();
 
-// 自动定位 bun 路径（优先用环境变量，再检查默认安装位置，最后 fallback 到 PATH）
-const bunPath =
-  process.env.BUN_PATH ||
-  path.join(os.homedir(), '.bun', 'bin', 'bun.exe');
-const bun = fs.existsSync(bunPath) ? bunPath : 'bun';
+// 自动定位 bun.exe（纯文件系统查找，无子进程，无 DEP0190 警告）
+function resolveBunExe() {
+  // 1. 用户指定路径
+  if (process.env.BUN_PATH && fs.existsSync(process.env.BUN_PATH)) {
+    return process.env.BUN_PATH;
+  }
+  const home = os.homedir();
+  const appData = process.env.APPDATA || path.join(home, 'AppData', 'Roaming');
+  const candidates = [
+    // npm install -g bun 的真实 exe（最常见）
+    path.join(appData, 'npm', 'node_modules', 'bun', 'bin', 'bun.exe'),
+    // bun 官方安装脚本位置
+    path.join(home, '.bun', 'bin', 'bun.exe'),
+  ];
+  // 遍历 PATH 中每个目录查找 bun.exe
+  for (const dir of (process.env.PATH || '').split(path.delimiter)) {
+    candidates.push(path.join(dir, 'bun.exe'));
+  }
+  for (const c of candidates) {
+    try { if (fs.existsSync(c)) return c; } catch (_) {}
+  }
+  return null;
+}
+
+const bun = resolveBunExe();
+if (!bun) {
+  console.error('[claude] 找不到 bun.exe，请先执行: npm install -g bun');
+  process.exit(1);
+}
 
 // 主 CLI 入口
 const entry = path.join(__dirname, '..', 'src', 'entrypoints', 'cli.tsx');

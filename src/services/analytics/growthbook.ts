@@ -685,6 +685,11 @@ async function getFeatureValueInternal<T>(
   }
 
   if (!isGrowthBookEnabled()) {
+    // No network-based GrowthBook; fall back to disk cache via GlobalConfig.
+    try {
+      const cc = getGlobalConfig().cachedGrowthBookFeatures
+      if (cc && feature in cc) return cc[feature] as T
+    } catch {}
     return defaultValue
   }
 
@@ -748,6 +753,11 @@ export function getFeatureValue_CACHED_MAY_BE_STALE<T>(
   }
 
   if (!isGrowthBookEnabled()) {
+    // No network-based GrowthBook; fall back to disk cache via GlobalConfig.
+    try {
+      const cc = getGlobalConfig().cachedGrowthBookFeatures
+      if (cc && feature in cc) return cc[feature] as T
+    } catch {}
     return defaultValue
   }
 

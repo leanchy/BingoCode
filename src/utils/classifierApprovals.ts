@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tracks which tool uses were auto-approved by classifiers.
  * Populated from useCanUseTool.ts and permissions.ts, read from UserToolSuccessMessage.tsx.
  */
@@ -20,7 +20,7 @@ export function setClassifierApproval(
   toolUseID: string,
   matchedRule: string,
 ): void {
-  if (!feature('BASH_CLASSIFIER')) {
+  if (!true) {
     return
   }
   CLASSIFIER_APPROVALS.set(toolUseID, {
@@ -30,7 +30,7 @@ export function setClassifierApproval(
 }
 
 export function getClassifierApproval(toolUseID: string): string | undefined {
-  if (!feature('BASH_CLASSIFIER')) {
+  if (!true) {
     return undefined
   }
   const approval = CLASSIFIER_APPROVALS.get(toolUseID)
@@ -42,7 +42,7 @@ export function setYoloClassifierApproval(
   toolUseID: string,
   reason: string,
 ): void {
-  if (!feature('TRANSCRIPT_CLASSIFIER')) {
+  if (!true) {
     return
   }
   CLASSIFIER_APPROVALS.set(toolUseID, { classifier: 'auto-mode', reason })
@@ -51,7 +51,7 @@ export function setYoloClassifierApproval(
 export function getYoloClassifierApproval(
   toolUseID: string,
 ): string | undefined {
-  if (!feature('TRANSCRIPT_CLASSIFIER')) {
+  if (!true) {
     return undefined
   }
   const approval = CLASSIFIER_APPROVALS.get(toolUseID)
@@ -60,13 +60,13 @@ export function getYoloClassifierApproval(
 }
 
 export function setClassifierChecking(toolUseID: string): void {
-  if (!feature('BASH_CLASSIFIER') && !feature('TRANSCRIPT_CLASSIFIER')) return
+  if (!true && !true) return
   CLASSIFIER_CHECKING.add(toolUseID)
   classifierChecking.emit()
 }
 
 export function clearClassifierChecking(toolUseID: string): void {
-  if (!feature('BASH_CLASSIFIER') && !feature('TRANSCRIPT_CLASSIFIER')) return
+  if (!true && !true) return
   CLASSIFIER_CHECKING.delete(toolUseID)
   classifierChecking.emit()
 }

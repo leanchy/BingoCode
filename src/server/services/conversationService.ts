@@ -664,7 +664,7 @@ export class ConversationService {
     }
 
     if (/\.(?:[cm]?[jt]s|tsx?)$/i.test(cliCommand)) {
-      return ['bun', cliCommand, ...baseArgs]
+      return [process.execPath, cliCommand, ...baseArgs]
     }
 
     const cliBaseName = path.basename(cliCommand)

@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bun run:*)",
+      "Bash(powershell -Command \"Get-ChildItem -Path C:\\\\Users\\\\qi.lin\\\\AppData\\\\Roaming\\\\npm -Recurse -Filter ''CliMenuManager.tsx'' 2>$null | Select-Object -ExpandProperty FullName\")",
+      "Bash(powershell -Command \"Get-ChildItem -Path ''C:\\\\Users\\\\qi.lin\\\\AppData\\\\Roaming\\\\npm\\\\node_modules'' -Recurse -Filter ''CliMenuManager.js'' 2>$null | Select-Object -ExpandProperty FullName\")",
+      "Read(//c/Users/qi.lin/AppData/Roaming/npm/**)",
+      "Bash(find C:Usersqi.linAppDataRoamingnpmnode_modulesbingocode -name *.tsx -o -name *.ts)",
+      "Bash(python3 -c \"import json; d = json.load\\(open\\(r''C:\\\\Users\\\\qi.lin\\\\.claude\\\\bingo\\\\settings.json''\\)\\); print\\(json.dumps\\(d, indent=2\\)\\)\")",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(''''cachedGrowthBookFeatures keys:'''', list\\(d.get\\(''''cachedGrowthBookFeatures'''',{}\\)\\)\\)\")",
+      "Bash(node -e \"const d=JSON.parse\\(require\\(''''fs''''\\).readFileSync\\(''''/dev/stdin'''',''''utf8''''\\)\\); console.log\\(''''cachedGrowthBookFeatures keys:'''', Object.keys\\(d.cachedGrowthBookFeatures||{}\\)\\); const ac = d.cachedGrowthBookFeatures?.[''''tengu_auto_mode_config'''']; console.log\\(''''tengu_auto_mode_config:'''', JSON.stringify\\(ac\\)\\)\")"
+    ]
+  }
+}

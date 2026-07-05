@@ -28,6 +28,112 @@ import { getGlobalConfig, saveGlobalConfig } from '../utils/config.ts';
 const MARKED_FILE = path.join(os.homedir(), '.claude-cli', 'markedSessions.json');
 
 /**
+ * Get the path to ~/.claude/bingo/settings.json (offline persistence for language
+ * and auto-mode settings, same file used by provider service). This ensures
+ * these settings survive across full restarts.
+ */
+function getBingoSettingsPath(): string {
+  const configDir = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude');
+  return path.join(configDir, 'bingo', 'settings.json');
+}
+
+function readBingoSettings(): Record<string, unknown> {
+  try {
+    const raw = fs.readFileSync(getBingoSettingsPath(), 'utf-8');
+    return JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+}
+
+function writeBingoSettings(updates: Record<string, unknown>): void {
+  const p = getBingoSettingsPath();
+  const dir = path.dirname(p);
+  if (!fs.existsSync(dir)) { fs.mkdirSync(dir, { recursive: true }); }
+
+  let current: Record<string, unknown> = {};
+  try {
+    if (fs.existsSync(p)) {
+      const raw = fs.readFileSync(p, 'utf-8');
+      current = JSON.parse(raw) as Record<string, unknown>;
+    }
+  } catch {}
+
+  const merged = { ...current, ...updates };
+
+  // atomic write via temp + rename
+  const tmp = `${p}.tmp.${Date.now()}`;
+  fs.writeFileSync(tmp, JSON.stringify(merged, null, 2) + '\n', 'utf-8');
+  fs.renameSync(tmp, p);
+}
+
+// write yml
+function readGlobalClaudeConfig(): Record<string, unknown> {
+  const configPath = path.join(os.homedir(), '.claude.json');
+  try {
+    const raw = fs.readFileSync(configPath, 'utf-8');
+    return JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+}
+
+// write merge config directly to ~/.claude.json (atomic write)
+function writeGlobalClaudeConfig(updates: Record<string, unknown>): void {
+  const configPath = path.join(os.homedir(), '.claude.json');
+  const dir = path.dirname(configPath);
+  if (!fs.existsSync(dir)) { fs.mkdirSync(dir, { recursive: true }); }
+
+  let current: Record<string, unknown> = {};
+  try {
+    if (fs.existsSync(configPath)) {
+      const raw = fs.readFileSync(configPath, 'utf-8');
+      current = JSON.parse(raw) as Record<string, unknown>;
+    }
+  } catch {}
+
+  const merged = { ...current, ...updates };
+
+  // atomic write via temp + rename
+  const tmp = `${configPath}.tmp.${Date.now()}`;
+  fs.writeFileSync(tmp, JSON.stringify(merged, null, 2) + '\n', 'utf-8');
+  fs.renameSync(tmp, configPath);
+}
+
+function readClaudeSettings(): Record<string, unknown> {
+  const configDir = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude');
+  const settingsPath = path.join(configDir, 'settings.json');
+  try {
+    const raw = fs.readFileSync(settingsPath, 'utf-8');
+    return JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+}
+
+function writeClaudeSettings(updates: Record<string, unknown>): void {
+  const configDir = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude');
+  const settingsPath = path.join(configDir, 'settings.json');
+  const dir = path.dirname(settingsPath);
+  if (!fs.existsSync(dir)) { fs.mkdirSync(dir, { recursive: true }); }
+
+  let current: Record<string, unknown> = {};
+  try {
+    if (fs.existsSync(settingsPath)) {
+      const raw = fs.readFileSync(settingsPath, 'utf-8');
+      current = JSON.parse(raw) as Record<string, unknown>;
+    }
+  } catch {}
+
+  const merged = { ...current, ...updates };
+
+  // atomic write via temp + rename
+  const tmp = `${settingsPath}.tmp.${Date.now()}`;
+  fs.writeFileSync(tmp, JSON.stringify(merged, null, 2) + '\n', 'utf-8');
+  fs.renameSync(tmp, settingsPath);
+}
+
+/**
  * Determine if in "official" mode (no custom provider active).
  * Logic matches ConversationService.shouldMarkManagedOAuth().
  */
@@ -115,8 +221,14 @@ const i18nMap = {
     settingsTitle: '设置',
     langLabel: '语言',
     langPickerTitle: '选择语言',
-    settingsHint: '↑/k ↓/j 滚动 · ↩ 编辑 · ESC 返回',
+    settingsHint: '↑/k ↓/j 滚动 · ↩ 切换 · ESC 返回',
     langOptions: LANG_OPTIONS,
+    autoModeLabel: 'Auto Mode',
+    autoModeOn: '已开启',
+    autoModeOff: '已关闭',
+    bypassPermsLabel: 'Bypass',
+    bypassPermsOn: '已开启',
+    bypassPermsOff: '已关闭',
   },
   en: {
     menu: {
@@ -148,8 +260,14 @@ const i18nMap = {
     settingsTitle: 'Settings',
     langLabel: 'Language',
     langPickerTitle: 'Select Language',
-    settingsHint: '↑/k ↓/j scroll · ↩ edit · ESC back',
+    settingsHint: '↑/k ↓/j scroll · ↩ toggle · ESC back',
     langOptions: LANG_OPTIONS,
+    autoModeLabel: 'Auto Mode',
+    autoModeOn: 'Enabled',
+    autoModeOff: 'Disabled',
+    bypassPermsLabel: 'Bypass',
+    bypassPermsOn: 'Enabled',
+    bypassPermsOff: 'Disabled',
   },
   ja: {
     menu: {
@@ -181,8 +299,14 @@ const i18nMap = {
     settingsTitle: '設定',
     langLabel: '言語',
     langPickerTitle: '言語を選択',
-    settingsHint: '↑/k ↓/j スクロール · ↩ 編集 · ESC 戻る',
+    settingsHint: '↑/k ↓/j スクロール · ↩ 切替 · ESC 戻る',
     langOptions: LANG_OPTIONS,
+    autoModeLabel: 'Auto Mode',
+    autoModeOn: '有効',
+    autoModeOff: '無効',
+    bypassPermsLabel: 'Bypass',
+    bypassPermsOn: '有効',
+    bypassPermsOff: '無効',
   },
 };
 
@@ -290,18 +414,31 @@ export const CliMenuManager: React.FC = () => {
   // Config ready probe (avoid Logo early read)
   const [configReady, setConfigReady] = useState(false);
 
+  // Load settings from bingo/settings.json at startup
+  // (bypasses configReady to avoid stale lock issues)
+  useEffect(() => {
+    try {
+      const bSettings = readBingoSettings();
+      const bingoLang = bSettings.language as string | undefined;
+      if (bingoLang && (bingoLang === 'en' || bingoLang === 'zh' || bingoLang === 'ja')) {
+        setLang(bingoLang as Lang);
+      }
+      if (typeof bSettings.autoModeEnabled === 'boolean') {
+        setAutoModeEnabled(bSettings.autoModeEnabled);
+      }
+      if (typeof bSettings.bypassPermsEnabled === 'boolean') {
+        setBypassPermsEnabled(bSettings.bypassPermsEnabled);
+      }
+    } catch {}
+  }, []);
+
   useEffect(() => {
     if (configReady) {
       try {
         const cfg = getGlobalConfig();
-        if (cfg.language && (cfg.language === 'en' || cfg.language === 'zh' || cfg.language === 'ja')) {
-          setLang(cfg.language as Lang);
-        }
         if (typeof cfg.uiAnimEnabled === 'boolean') setAnimEnabled(cfg.uiAnimEnabled);
         if (typeof cfg.uiTipsEnabled === 'boolean') setTipsEnabled(cfg.uiTipsEnabled);
-      } catch (e) {
-        // Silently fail if config has issues
-      }
+      } catch {}
     }
   }, [configReady]);
 
@@ -349,6 +486,8 @@ export const CliMenuManager: React.FC = () => {
   const [setErr, setSetErr] = useState<string | null>(null);
   const [settingsStage, setSettingsStage] = useState<'list' | 'langPicker'>('list');
   const [settingsCursor, setSettingsCursor] = useState(0);
+  const [autoModeEnabled, setAutoModeEnabled] = useState(false);
+  const [bypassPermsEnabled, setBypassPermsEnabled] = useState(false);
 
   // Top toolbar state
   const [animEnabled, setAnimEnabled] = useState(true);
@@ -577,11 +716,7 @@ export const CliMenuManager: React.FC = () => {
       const langOrder: Lang[] = ['en', 'zh', 'ja'];
       const nextLang = langOrder[(langOrder.indexOf(lang) + 1) % langOrder.length];
       setLang(nextLang);
-      try {
-        const cfg = getGlobalConfig();
-        cfg.language = nextLang;
-        saveGlobalConfig(cfg);
-      } catch {}
+      try { writeBingoSettings({ language: nextLang }); } catch {}
       return;
     }
 
@@ -592,11 +727,7 @@ export const CliMenuManager: React.FC = () => {
       const idx = Math.max(0, order.indexOf(curr as any));
       const next = order[(idx + 1) % order.length];
       setTheme(next as any);
-      try {
-        const cfg = getGlobalConfig();
-        cfg.theme = next as any;
-        saveGlobalConfig(cfg);
-      } catch {}
+      try { saveGlobalConfig(current => ({ ...current, theme: next as any })); } catch {}
       return;
     }
 
@@ -604,7 +735,7 @@ export const CliMenuManager: React.FC = () => {
     if (input === 'o' || input === 'O') {
       setAnimEnabled(v => {
         const next = !v;
-        try { const cfg = getGlobalConfig(); cfg.uiAnimEnabled = next; saveGlobalConfig(cfg); } catch {}
+        try { saveGlobalConfig(current => ({ ...current, uiAnimEnabled: next })); } catch {}
         return next;
       });
       return;
@@ -613,7 +744,7 @@ export const CliMenuManager: React.FC = () => {
     if (input === 't' || input === 'T') {
       setTipsEnabled(v => {
         const next = !v;
-        try { const cfg = getGlobalConfig(); cfg.uiTipsEnabled = next; saveGlobalConfig(cfg); } catch {}
+        try { saveGlobalConfig(current => ({ ...current, uiTipsEnabled: next })); } catch {}
         return next;
       });
       return;
@@ -744,7 +875,7 @@ export const CliMenuManager: React.FC = () => {
     if (!showHelp && page === 'settings') {
       if (settingsStage === 'list') {
         // +1 for the fixed Language row prepended before settingData entries
-        const totalRows = 1 + (settingData && typeof settingData === 'object' ? Object.keys(settingData).length : 0);
+        const totalRows = 3 + (settingData && typeof settingData === 'object' ? Object.keys(settingData).length : 0);
         const visible = Math.max(1, MID_H - 2);
         if (key.downArrow || input === 'j') {
           setSettingsCursor(c => Math.min(totalRows - 1, c + 1));
@@ -758,12 +889,46 @@ export const CliMenuManager: React.FC = () => {
           // Row 0 is the interactive Language row
           if (settingsCursor === 0) {
             setSettingsStage('langPicker');
+          } else if (settingsCursor === 1) {
+            // Row 1: toggle Auto Mode
+            setAutoModeEnabled(prev => {
+              const next = !prev;
+              try {
+                writeBingoSettings({ autoModeEnabled: next });
+                const gcfg = readGlobalClaudeConfig();
+                gcfg.cachedGrowthBookFeatures = {
+                  ...(gcfg.cachedGrowthBookFeatures as Record<string, unknown>),
+                  tengu_auto_mode_config: next
+                    ? { enabled: 'enabled', allowModels: ['*'] }
+                    : { enabled: 'disabled' },
+                };
+                writeGlobalClaudeConfig(gcfg);
+              } catch {
+                return prev; // write failed — keep old state
+              }
+              return next;
+            });
+          } else if (settingsCursor === 2) {
+            // Row 2: toggle Bypass Permissions
+            setBypassPermsEnabled(prev => {
+              const next = !prev;
+              try {
+                writeBingoSettings({ bypassPermsEnabled: next });
+                const safeSettings = next
+                  ? { permissions: { defaultMode: 'bypassPermissions', skipDangerousModePermissionPrompt: true } }
+                  : { permissions: { defaultMode: 'default' } };
+                writeClaudeSettings(safeSettings);
+              } catch {
+                return prev; // write failed — keep old state
+              }
+              return next;
+            });
           }
         }
       }
       // langPicker stage: ESC handled above; selection via SelectInput onSelect
     }
-  }, [menuItems, page, historyMenuStage, historyList, historyHasMore, navIndex, sessionMessages, settingData, MID_H, MSGS_PAGE_SIZE, showHelp, theme, settingsStage, settingsCursor]);
+  }, [menuItems, page, historyMenuStage, historyList, historyHasMore, navIndex, sessionMessages, settingData, MID_H, MSGS_PAGE_SIZE, showHelp, theme, settingsStage, settingsCursor, autoModeEnabled, bypassPermsEnabled]);
 
   function cleanText(text: string): string {
     return String(text ?? '').replace(/[\n\r]+/g, ' ').replace(/\u001b\[[0-9;]*m/g, '').trim();
@@ -1229,11 +1394,7 @@ export const CliMenuManager: React.FC = () => {
                 initialIndex={tS.langOptions.findIndex(o => o.value === lang)}
                 onSelect={(item: { label: string; value: Lang }) => {
                   setLang(item.value);
-                  try {
-                    const cfg = getGlobalConfig();
-                    cfg.language = item.value;
-                    saveGlobalConfig(cfg);
-                  } catch {}
+                  try { writeBingoSettings({ language: item.value }); } catch {}
                   setSettingsStage('list');
                 }}
               />
@@ -1249,6 +1410,8 @@ export const CliMenuManager: React.FC = () => {
       type SettingRow = { key: string; label: string; value: string; interactive: boolean };
       const fixedRows: SettingRow[] = [
         { key: '__lang', label: tS.langLabel, value: currentLangLabel, interactive: true },
+        { key: '__autoMode', label: tS.autoModeLabel, value: autoModeEnabled ? tS.autoModeOn : tS.autoModeOff, interactive: true },
+        { key: '__bypassPerms', label: tS.bypassPermsLabel, value: bypassPermsEnabled ? tS.bypassPermsOn : tS.bypassPermsOff, interactive: true },
       ];
       const dataEntries = settingData && typeof settingData === 'object' ? Object.entries(settingData) : [];
       const dataRows: SettingRow[] = dataEntries.map(([k, v]) => ({

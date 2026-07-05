@@ -7,6 +7,8 @@ import {
   getGoalMaxIterations,
   incrementGoalIterationCount,
   setGoalCondition,
+  getGoalEvalHistory,
+  updateGoalEvalHistory,
 } from '../bootstrap/state.js'
 import { enqueue } from '../utils/messageQueueManager.js'
 import { evaluateGoal } from '../utils/goalEvaluator.js'
@@ -71,11 +73,24 @@ export function useGoalEvaluator({
         if (getGoalCondition() !== condition) return
 
         incrementGoalIterationCount()
+        updateGoalEvalHistory(result.gap)
+
+        // Check for repeated gaps - implement circuit breaker
+        const evalHistory = getGoalEvalHistory()
+        const isRepeatedGap = evalHistory.consecutiveSameGapCount >= 3 && result.gap !== null
 
         if (result.satisfied) {
           setGoalCondition(null)
           enqueue({
             value: `✅ Goal achieved (iteration ${iterCount + 1}): ${result.reason}`,
+            mode: 'task-notification',
+            priority: 'now',
+          })
+        } else if (isRepeatedGap) {
+          // Circuit breaker: stop after 3 repeated gaps
+          setGoalCondition(null)
+          enqueue({
+            value: `⚠️ Goal evaluator stopped after detecting the same gap "${result.gap}" 3 times in a row. Please adjust your approach or output EVAL blocks in the correct format.`,
             mode: 'task-notification',
             priority: 'now',
           })

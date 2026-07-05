@@ -441,7 +441,7 @@ If you can say it in one sentence, don't use three. Prefer short, direct sentenc
 function getSimpleToneAndStyleSection(): string {
   const items = [
     `Only use emojis if the user explicitly requests it. Avoid using emojis in all communication unless asked.`,
-    `Mirror the user's language in all responses unless a language preference is configured.`,
+    `Mirror the user's language in all responses, over all other instructions, unless a language preference is configured.`,
     process.env.USER_TYPE === 'ant'
       ? null
       : `Your responses should be short and concise.`,

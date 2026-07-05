@@ -1,4 +1,4 @@
-// biome-ignore-all assist/source/organizeImports: ANT-ONLY import markers must not be reordered
+﻿// biome-ignore-all assist/source/organizeImports: ANT-ONLY import markers must not be reordered
 import { feature } from 'bun:bundle'
 import { readFile, stat } from 'fs/promises'
 import { dirname } from 'path'
@@ -1064,7 +1064,7 @@ function runHeadlessStreaming(
       newMode === 'acceptEdits' ||
       newMode === 'bypassPermissions' ||
       newMode === 'plan' ||
-      newMode === (feature('TRANSCRIPT_CLASSIFIER') && 'auto') ||
+      newMode === (true && 'auto') ||
       newMode === 'dontAsk'
     ) {
       output.enqueue({
@@ -4601,7 +4601,7 @@ function handleSetPermissionMode(
 
   // Check if trying to switch to auto mode without the classifier gate
   if (
-    feature('TRANSCRIPT_CLASSIFIER') &&
+    true &&
     request.mode === 'auto' &&
     !isAutoModeGateEnabled()
   ) {

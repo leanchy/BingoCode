@@ -56,59 +56,55 @@ const ROOT_DIR = getProjectRoot();
   }
 })();
 
-// 自动定位 bun 路径
-const bunPath =
-  process.env.BUN_PATH ||
-  path.join(os.homedir(), '.bun', 'bin', 'bun.exe');
+// 自动定位 bun.exe（纯文件系统查找，无子进程，无 DEP0190 警告）
+function resolveBunExe() {
+  // 1. 用户指定路径
+  if (process.env.BUN_PATH && fs.existsSync(process.env.BUN_PATH)) {
+    return process.env.BUN_PATH;
+  }
+  const home = os.homedir();
+  const appData = process.env.APPDATA || path.join(home, 'AppData', 'Roaming');
+  const candidates = [
+    // npm install -g bun 的真实 exe（最常见）
+    path.join(appData, 'npm', 'node_modules', 'bun', 'bin', 'bun.exe'),
+    // bun 官方安装脚本位置
+    path.join(home, '.bun', 'bin', 'bun.exe'),
+  ];
+  // 遍历 PATH 中每个目录查找 bun.exe
+  for (const dir of (process.env.PATH || '').split(path.delimiter)) {
+    candidates.push(path.join(dir, 'bun.exe'));
+  }
+  for (const c of candidates) {
+    try { if (fs.existsSync(c)) return c; } catch (_) {}
+  }
+  return null;
+}
 
 // 检查 bun 是否可用
 function bunExists() {
-  if (fs.existsSync(bunPath)) return true;
-  try {
-    const result = spawnSync('bun', ['--version'], { stdio: 'ignore', shell: true });
-    return result.status === 0;
-  } catch (e) {
-    return false;
-  }
+  return resolveBunExe() !== null;
 }
 
-// 安装 bun（通过 npm 拉取官方包，不走 GitHub/bun.sh）
+// 安装 bun（通过 npm install -g bun）
 function installBun() {
-  console.log('[bingocode] bun 未检测到，正在通过 npm 安装...');
+  console.log('[bingocode] bun 未检测到，正在通过 npm install -g bun 安装...');
 
-  // 用 npm install 拉取平台对应包，安装到临时目录后复制 bun.exe
-  const tmpDir = path.join(os.tmpdir(), 'bingocode-bun-install');
   try {
-    fs.mkdirSync(tmpDir, { recursive: true });
-
-    // npm install @oven/bun-windows-x64 到临时目录
     const npmResult = spawnSync(
-      'npm',
-      ['install', '@oven/bun-windows-x64', '--prefix', tmpDir, '--no-save', '--loglevel', 'error'],
-      { stdio: 'inherit', shell: true }
+      'npm.cmd',
+      ['install', '-g', 'bun', '--loglevel', 'error'],
+      { stdio: 'inherit' }
     );
     if (npmResult.status !== 0) {
-      throw new Error(`npm install 失败，exit code ${npmResult.status}`);
+      throw new Error(`npm install -g bun 失败，exit code ${npmResult.status}`);
     }
-
-    // 从 node_modules 复制 bun.exe → ~/.bun/bin/bun.exe
-    const src = path.join(tmpDir, 'node_modules', '@oven', 'bun-windows-x64', 'bin', 'bun.exe');
-    if (!fs.existsSync(src)) {
-      throw new Error(`未找到 ${src}`);
-    }
-    const destDir = path.dirname(bunPath);
-    if (!fs.existsSync(destDir)) fs.mkdirSync(destDir, { recursive: true });
-    fs.copyFileSync(src, bunPath);
 
     console.log('[bingocode] bun 安装完成，正在启动...');
     return true;
   } catch (err) {
     console.error(`[bingocode] bun 自动安装失败: ${err.message}`);
-    console.log('[bingocode] 请手动安装 bun: npm install -g @oven/bun-windows-x64');
+    console.log('[bingocode] 请手动安装 bun: npm install -g bun');
     return false;
-  } finally {
-    // 清理临时目录（非阻塞）
-    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch (_) {}
   }
 }
 
@@ -118,8 +114,12 @@ if (!bunExists()) {
   }
 }
 
-// 安装后 bun.exe 在固定位置；若在 PATH 里则直接用 "bun"
-const bun = fs.existsSync(bunPath) ? bunPath : 'bun';
+// 安装完成后重新解析 bun 路径
+const bunExe = resolveBunExe();
+if (!bunExe) {
+  console.error('[bingocode] 安装后仍找不到 bun.exe，请重新打开终端后再试，或手动安装 bun: npm install -g bun');
+  process.exit(1);
+}
 
 // Bingo Manager 入口
 const entry = path.join(ROOT_DIR, 'src', 'entrypoints', 'manager.tsx');
@@ -139,8 +139,77 @@ if (fs.existsSync(envPath)) {
 }
 
 const extraArgs = process.argv.slice(2);
+
+// ── Start tray daemon if not already running ────────────────────────────────
+const RUNTIME_DIR = path.join(os.homedir(), '.claude-cli', 'runtime');
+const DAEMON_LOCK_FILE = path.join(RUNTIME_DIR, 'daemon.lock');
+
+function serverHealthy() {
+  return new Promise((resolve) => {
+    const http = require('http');
+    const req = http.get('http://127.0.0.1:3456/health', { timeout: 1000 }, (res) => {
+      let data = '';
+      res.on('data', (c) => (data += c));
+      res.on('end', () => {
+        try {
+          resolve(res.statusCode === 200 && JSON.parse(data).status === 'ok');
+        } catch {
+          resolve(false);
+        }
+      });
+    });
+    req.on('error', () => resolve(false));
+    req.setTimeout(1000, () => { req.destroy(); resolve(false); });
+  });
+}
+
+function isDaemonAlive() {
+  try {
+    const pid = parseInt(fs.readFileSync(DAEMON_LOCK_FILE, 'utf-8').trim(), 10);
+    process.kill(pid, 0); // signal 0 == probe only
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const CHECK_MS = 3000;
+
+async function startTrayDaemonIfNeeded() {
+  // Daemon PID lock prevents race: only one daemon runs across multiple bingo launches
+  if (isDaemonAlive()) {
+    console.log('[bingo] Daemon already running, skipping daemon start');
+    return;
+  }
+
+  // stale lock cleanup
+  try { fs.unlinkSync(DAEMON_LOCK_FILE); } catch {}
+
+  console.log('[bingo] Starting tray daemon...');
+  const trayEntry = path.join(ROOT_DIR, 'src', 'entrypoints', 'tray-only.ts');
+  const daemon = spawn(bunExe, ['--preload=' + preload, trayEntry], {
+    detached: true,
+    stdio: 'ignore',
+    env: { ...process.env },
+  });
+  daemon.unref();
+
+  // Wait for health check
+  const start = Date.now();
+  while (Date.now() - start < CHECK_MS) {
+    if (await serverHealthy()) {
+      console.log('[bingo] Tray daemon started successfully');
+      break;
+    }
+    await (new Promise((r) => setTimeout(r, 300)));
+  }
+}
+
+// Start daemon, then launch CLI independently
+startTrayDaemonIfNeeded().catch(() => {});
+
+// ── Launch CLI (connects to existing server) ───────────────────────────────
 const args = [`--preload=${preload}`, envFlag, entry, ...extraArgs].filter(Boolean);
 
-const child = spawn(bun, args, { stdio: 'inherit' });
-
-child.on('exit', (code) => process.exit(code));
+// 用绝对路径 spawn，不依赖 shell 解析 PATH
+const child = spawn(bunExe, args, { stdio: 'inherit' });

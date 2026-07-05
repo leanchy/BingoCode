@@ -1,4 +1,4 @@
-import { feature } from 'bun:bundle'
+﻿import { feature } from 'bun:bundle'
 import type { UUID } from 'crypto'
 import { randomUUID } from 'crypto'
 import uniqBy from 'lodash-es/uniqBy.js'
@@ -423,7 +423,7 @@ export async function* runAgent({
       state.toolPermissionContext.mode !== 'bypassPermissions' &&
       state.toolPermissionContext.mode !== 'acceptEdits' &&
       !(
-        feature('TRANSCRIPT_CLASSIFIER') &&
+        true &&
         state.toolPermissionContext.mode === 'auto'
       )
     ) {

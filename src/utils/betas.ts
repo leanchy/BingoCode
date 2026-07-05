@@ -1,4 +1,4 @@
-import { feature } from 'bun:bundle'
+﻿import { feature } from 'bun:bundle'
 import memoize from 'lodash-es/memoize.js'
 import {
   checkStatsigFeatureGate_CACHED_MAY_BE_STALE,
@@ -158,12 +158,24 @@ export function modelSupportsStructuredOutputs(model: string): boolean {
 
 // @[MODEL LAUNCH]: Add the new model if it supports auto mode (specifically PI probes) — ask in #proj-claude-code-safety-research.
 export function modelSupportsAutoMode(model: string): boolean {
-  if (feature('TRANSCRIPT_CLASSIFIER')) {
+  if (true) {
     const m = getCanonicalName(model)
     // External: firstParty-only at launch (PI probes not wired for
     // Bedrock/Vertex/Foundry yet). Checked before allowModels so the GB
     // override can't enable auto mode on unsupported providers.
-    if (process.env.USER_TYPE !== 'ant' && getAPIProvider() !== 'firstParty') {
+    // NOTE(leanchy): For BingoCode fork, bypass the provider check when
+    // the user has explicitly opted into auto mode AND set the env var.
+    // Original: if (process.env.USER_TYPE !== 'ant' && getAPIProvider() !== 'firstParty')
+    const autoModeOptIn = getFeatureValue_CACHED_MAY_BE_STALE<{ enabled?: string }>(
+      'tengu_auto_mode_config',
+      {},
+    )
+    if (
+      process.env.USER_TYPE !== 'ant' &&
+      getAPIProvider() !== 'firstParty' &&
+      !isEnvTruthy(process.env.CLAUDE_CODE_ENABLE_AUTO_WITH_ANY_PROVIDER) &&
+      autoModeOptIn?.enabled !== 'enabled'
+    ) {
       return false
     }
     // GrowthBook override: tengu_auto_mode_config.allowModels force-enables
@@ -176,7 +188,7 @@ export function modelSupportsAutoMode(model: string): boolean {
     const rawLower = model.toLowerCase()
     if (
       config?.allowModels?.some(
-        am => am.toLowerCase() === rawLower || am.toLowerCase() === m,
+        am => am === '*' || am.toLowerCase() === rawLower || am.toLowerCase() === m,
       )
     ) {
       return true

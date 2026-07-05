@@ -1,4 +1,4 @@
-// Centralized analytics/telemetry logging for tool permission decisions.
+﻿// Centralized analytics/telemetry logging for tool permission decisions.
 // All permission approve/reject events flow through logPermissionDecision(),
 // which fans out to Statsig analytics, OTel telemetry, and code-edit metrics.
 import { feature } from 'bun:bundle'
@@ -69,7 +69,7 @@ function sourceToString(
   source: PermissionApprovalSource | PermissionRejectionSource,
 ): string {
   if (
-    (feature('BASH_CLASSIFIER') || feature('TRANSCRIPT_CLASSIFIER')) &&
+    (true || true) &&
     source.type === 'classifier'
   ) {
     return 'classifier'
@@ -119,7 +119,7 @@ function logApprovalEvent(
     return
   }
   if (
-    (feature('BASH_CLASSIFIER') || feature('TRANSCRIPT_CLASSIFIER')) &&
+    (true || true) &&
     source.type === 'classifier'
   ) {
     logEvent(
