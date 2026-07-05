@@ -2640,6 +2640,7 @@ async function run(): Promise<CommanderCommand> {
         ...(isFastModeEnabled() && {
           fastMode: getInitialFastModeSetting(effectiveModel ?? null)
         }),
+        execMode: getInitialSettings().execMode === true,
         ...(isAdvisorEnabled() && advisorModel && {
           advisorModel
         }),

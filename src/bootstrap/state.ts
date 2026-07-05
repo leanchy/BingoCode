@@ -135,16 +135,7 @@ type State = {
   // (useScheduledTasks). Set by cronScheduler.start() when the JSON has
   // entries, or by CronCreateTool. Not persisted.
   scheduledTasksEnabled: boolean
-  // Session-only goal condition for /goal command. Null when no active goal.
-  goalCondition: string | null
-  goalIterationCount: number
-  goalMaxIterations: number
-  // Goal evaluator history for detecting repeated gaps
-  goalEvalHistory: {
-    lastGap: string | null
-    consecutiveSameGapCount: number
-  }
-  // Session-only cron tasks created via CronCreate with durable: false.
+    // Session-only cron tasks created via CronCreate with durable: false.
   // Fire on schedule like file-backed tasks but are never written to
   // .claude/scheduled_tasks.json — they die with the process. Typed via
   // SessionCronTask below (not importing from cronTasks.ts keeps
@@ -366,15 +357,7 @@ function getInitialState(): State {
     sessionBypassPermissionsMode: false,
     // Scheduled tasks disabled until flag or dialog enables them
     scheduledTasksEnabled: false,
-    // Goal condition for /goal command (null = no active goal)
-    goalCondition: null,
-    goalIterationCount: 0,
-    goalMaxIterations: 20,
-    goalEvalHistory: {
-      lastGap: null,
-      consecutiveSameGapCount: 0,
-    },
-    sessionCronTasks: [],
+        sessionCronTasks: [],
     sessionCreatedTeams: new Set(),
     // Session-only trust flag (not persisted to disk)
     sessionTrustAccepted: false,
@@ -1793,38 +1776,5 @@ export function setPromptId(id: string | null): void {
 // /goal session state accessors
 // ============================================================================
 
-export function getGoalCondition(): string | null {
-  return STATE.goalCondition
-}
-
-export function setGoalCondition(condition: string | null): void {
-  STATE.goalCondition = condition
-  STATE.goalIterationCount = 0
-}
-
-export function getGoalIterationCount(): number {
-  return STATE.goalIterationCount
-}
-
-export function incrementGoalIterationCount(): void {
-  STATE.goalIterationCount++
-}
-
-export function getGoalMaxIterations(): number {
-  return STATE.goalMaxIterations
-}
-
-// Goal evaluator history accessors
-export function getGoalEvalHistory() {
-  return STATE.goalEvalHistory
-}
-
-export function updateGoalEvalHistory(lastGap: string | null): void {
-  if (lastGap === STATE.goalEvalHistory.lastGap) {
-    STATE.goalEvalHistory.consecutiveSameGapCount++
-  } else {
-    STATE.goalEvalHistory.lastGap = lastGap
-    STATE.goalEvalHistory.consecutiveSameGapCount = 1
-  }
-}
+// ============================================================================
 

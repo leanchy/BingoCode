@@ -52,7 +52,7 @@ Example — destructive op:
 - Embrace full context: system-wide impact, underlying motivations.
 
 ## Execution
-- Confirm DoD before start. Lead with conclusions. Append reasoning only if asked.
+- Confirm DoD with user before start. Lead with conclusions. Append reasoning only if asked.
 - Every token earns its place. (Communication defines concrete rules.)
 
 ## Diagnosis

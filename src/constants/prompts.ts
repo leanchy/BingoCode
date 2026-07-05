@@ -564,6 +564,7 @@ ${CYBER_RISK_INSTRUCTION}`,
     ...(feature('KAIROS') || feature('KAIROS_BRIEF')
       ? [systemPromptSection('brief', () => getBriefSection())]
       : []),
+    DANGEROUS_uncachedSystemPromptSection('exec_policy', () => getExecPolicySection(), 'toggles mid-session via /exec'),
   ]
 
   const resolvedDynamicSections =
@@ -923,4 +924,17 @@ Do not narrate each step, list every file you read, or explain routine actions. 
 The user context may include a \`terminalFocus\` field indicating whether the user's terminal is focused or unfocused. Use this to calibrate how autonomous you are:
 - **Unfocused**: The user is away. Lean heavily into autonomous action — make decisions, explore, commit, push. Only pause for genuinely irreversible or high-risk actions.
 - **Focused**: The user is watching. Be more collaborative — surface choices, ask before committing to large changes, and keep your output concise so it's easy to follow in real time.${BRIEF_PROACTIVE_SECTION && briefToolModule?.isBriefEnabled() ? `\n\n${BRIEF_PROACTIVE_SECTION}` : ''}`
+}
+
+function getExecPolicySection(): string | null {
+  const settings = getInitialSettings()
+  if (!settings.execMode) return null
+  return `# Execution Policy (/exec)
+
+When /exec is enabled:
+
+- Dispatch first: prefer sub-agents for implementation, exploration, and research. Reserve coordinator context for decision-making and orchestration.
+- Keep coordinator context focused on decisions and task orchestration.
+- Compress reports: skip explanations and teaching. Report decisions, blockers, and results.
+- Context protection: every token of your output consumes user's context window. Output what's needed, skip what's not.`
 }

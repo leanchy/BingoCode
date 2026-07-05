@@ -110,6 +110,8 @@ import {
 } from './bootstrap/state.js'
 import { createBudgetTracker, checkTokenBudget } from './query/tokenBudget.js'
 import { count } from './utils/array.js'
+import { convertSDKToolResults } from './utils/goalHelpers.js'
+import { useGoalAutoUpdater } from './hooks/useGoalAutoUpdater.js'
 
 /* eslint-disable @typescript-eslint/no-require-imports */
 const snipModule = feature('HISTORY_SNIP')
@@ -1407,6 +1409,25 @@ async function* queryLoop(
       }
     }
     queryCheckpoint('query_tool_execution_end')
+
+    // === Goal system auto-update: PostToolUse hook ===
+    // Update goal state based on actual tool execution results.
+    // This replaces the old "output EVAL blocks" approach — now we track
+    // progress automatically from what the agent actually does.
+    if (toolUseBlocks.length > 0) {
+      try {
+        const goalResults = convertSDKToolResults(
+          toolUseBlocks as ReadonlyArray<{ id: string; name: string; input: Record<string, unknown> }>,
+          toolResults as ReadonlyArray<{ type: string; message: { content: { type: string; text?: string; tool_use_id?: string; content?: string }[] } }>,
+        )
+        for (const result of goalResults) {
+          useGoalAutoUpdater(result)
+        }
+      } catch (err) {
+        // Goal auto-update is non-critical — don't block the main loop
+        logError('goal_auto_update_error', err instanceof Error ? err.message : String(err))
+      }
+    }
 
     // Generate tool use summary after tool batch completes — passed to next recursive call
     let nextPendingToolUseSummary:

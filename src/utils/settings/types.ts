@@ -725,6 +725,12 @@ export const SettingsSchema = lazySchema(() =>
         .describe(
           'When true, fast mode does not persist across sessions. Each session starts with fast mode off.',
         ),
+      execMode: z
+        .boolean()
+        .optional()
+        .describe(
+          'Priority dispatch, context protection, compressed reporting.',
+        ),
       promptSuggestionEnabled: z
         .boolean()
         .optional()

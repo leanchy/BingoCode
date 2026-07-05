@@ -1,27 +1,30 @@
-import {
-  getGoalCondition,
-  getGoalMaxIterations,
-  setGoalCondition,
-} from '../../bootstrap/state.js'
+/**
+ * Goal command — CLI entry point for Goal Management system.
+ *
+ * 4-layer architecture: User Goal → Operational Goal → Sub Goals → Immediate Goal.
+ * Orchestrates creation, status queries, and management commands.
+ */
+
+import { getGoalState, setUserGoal, setOperationalGoal, clearState } from '../../utils/goalStore.js'
 import { registerBundledSkill } from '../bundledSkills.js'
 
-const USAGE = `Usage: /goal <condition>
+const USAGE = `Usage: /goal <create | clear | cancel>
 
-Set a session goal. The agent will keep working until the condition is met.
+Set a session goal. Agent will work autonomously until goal met.
 
 Examples:
-  /goal all tests pass
-  /goal login flow handles empty email without crash
-  /goal PR is ready for review with passing CI
+  /goal create all tests pass
+  /goal create login flow handles empty email without crash
+  /goal create PR ready for review with passing CI
 
-To cancel: /goal clear`
+To cancel: /goal clear or /goal cancel`
 
 export function registerGoalSkill(): void {
   registerBundledSkill({
     name: 'goal',
     description:
-      'Set a session-level goal condition and loop until met. Use when user says "/goal <condition>" or wants autonomous execution until a specific outcome is reached.',
-    argumentHint: '<condition | clear>',
+      'Manage task goals with hierarchical decomposition and progress tracking.',
+    argumentHint: '<create | clear | cancel>',
     userInvocable: true,
     async getPromptForCommand(args) {
       const trimmed = args.trim()
@@ -30,48 +33,54 @@ export function registerGoalSkill(): void {
         return [{ type: 'text', text: USAGE }]
       }
 
-      if (['clear', 'stop', 'cancel'].includes(trimmed)) {
-        const current = getGoalCondition()
-        if (current) {
-          setGoalCondition(null)
+      // --- Cancel / Clear ---
+      if (['clear', 'stop', 'cancel'].includes(trimmed.toLowerCase())) {
+        const state = getGoalState()
+        if (state.activeGoalId) {
+          const userText = state.userGoal?.text ?? '(unknown)'
+          clearState()
           return [
             {
               type: 'text',
-              text: `Goal cancelled: "${current}". Tell the user their goal has been cancelled.`,
+              text: `Goal cancelled: "${userText}". Goal state cleared from memory and disk.`,
             },
           ]
         }
         return [
           {
             type: 'text',
-            text: 'No active goal to cancel. Tell the user there is no active goal.',
+            text: 'No active goal. Use `/goal create <text>` to start.',
           },
         ]
       }
 
-      setGoalCondition(trimmed)
-      const maxIter = getGoalMaxIterations()
+      // --- Create ---
+      setUserGoal(trimmed)
+      setOperationalGoal(trimmed)
+      const state = getGoalState()
+      const maxIter = state.metrics.maxIterations
 
       return [
         {
           type: 'text',
           text: `# /goal activated
 
-Goal condition: "${trimmed}"
+**Goal**: "${trimmed}"
+**Architecture**: User Goal → Operational Goal → DAG Sub Goals → Immediate Action
+**Max iterations**: ${maxIter}
 
-This goal is now registered for this session. After each turn, an independent evaluator (Haiku 4.5, a weak model) will check whether the goal is satisfied. Maximum ${maxIter} iterations.
+The evaluator now uses **environment-aware assessment** (3 tiers):
+  Level 1: Rule engine — checks file existence, test output, compile status
+  Level 2: Haiku 4.5 — semantic interpretation of evidence
+  Level 3: Main model — final verification (ambiguous cases only)
 
-CRITICAL: The evaluator reads ONLY your text output. It cannot see code changes, tool results, or file contents — only the plain text you write.
+EVAL blocks still welcome for agent self-reporting, but no longer required.
+  Format: \`EVAL: metric: value / target → ✓ or ✗\`
 
-	At each turn toward the goal, output a short evaluation block like:
-	EVAL: [metric1]: [value] / [target] → ✓ or ✗
+Tell user: Goal set. Agent works autonomously until "${trimmed}" achieved (max ${maxIter} turns).
+Send \`/goal clear\` to cancel.
 
-	This block is the ONLY signal the evaluator can reliably process. Make it short,
-	unambiguous, and quantitative. Do NOT expect the evaluator to infer success from narrative discussion.
-	Note: The EVAL block can appear anywhere in your text response (not just in quote blocks).
-
-Tell the user: Goal set — you will work autonomously until "${trimmed}" is achieved (max ${maxIter} turns). Send \`/goal clear\` to cancel.
-Now begin: assess current state and take the first concrete action toward the goal.`,
+Now: assess current state, take first concrete action toward goal.`,
         },
       ]
     },

@@ -63,7 +63,7 @@ import {
   isValidImagePaste,
 } from 'src/types/textInputTypes.js'
 import { randomUUID, type UUID } from 'crypto'
-import { getSettings_DEPRECATED } from './settings/settings.js'
+import { getInitialSettings, getSettings_DEPRECATED } from './settings/settings.js'
 import { getSnippetForTwoFileDiff } from 'src/tools/FileEditTool/utils.js'
 import type {
   ContentBlockParam,
@@ -915,6 +915,9 @@ export async function getAttachments(
     maybe('critical_system_reminder', () =>
       Promise.resolve(getCriticalSystemReminderAttachment(toolUseContext)),
     ),
+    maybe('exec_mode_reminder', () =>
+      Promise.resolve(getExecModeReminderAttachment()),
+    ),
     ...(feature('COMPACTION_REMINDERS')
       ? [
           maybe('compaction_reminder', () =>
@@ -1588,6 +1591,19 @@ function getCriticalSystemReminderAttachment(
     return []
   }
   return [{ type: 'critical_system_reminder', content: reminder }]
+}
+
+function getExecModeReminderAttachment(): Attachment[] {
+  if (!getInitialSettings().execMode) {
+    return []
+  }
+  return [
+    {
+      type: 'system_reminder' as const,
+      content:
+        '/exec active — Dispatch first. Protect context. Report decisions, blockers, results.',
+    },
+  ]
 }
 
 function getOutputStyleAttachment(): Attachment[] {
