@@ -1,6 +1,6 @@
 {
   "name": "bingocode",
-  "version": "1.1.188",
+  "version": "1.1.193",
   "type": "module",
   "bin": {
     "claude": "bin/claude-win.cjs",
