@@ -93,8 +93,9 @@ export class GoalDagEngine {
       }
     }
 
-    // If result.length < nodes.size, there's a cycle — but we still
-    // return what we can (partial order is valid for dag validation).
+    if (result.length < this.nodes.size) {
+      throw new Error('DAG cycle detected: topological sort cannot complete')
+    }
     return result
   }
 
@@ -180,6 +181,15 @@ export class GoalDagEngine {
     }
     this.nodes.set(internal.id, internal)
     this.rebuildEdges()
+    const { valid, cycles } = this.validate()
+    if (!valid) {
+      // Rollback: remove the node that introduced the cycle
+      this.nodes.delete(internal.id)
+      this.rebuildEdges()
+      throw new Error(
+        `DAG cycle detected after adding node "${subGoal.text}": ${JSON.stringify(cycles)}`,
+      )
+    }
   }
 
   /** Remove a node and all its associated edges. */

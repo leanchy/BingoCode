@@ -12,6 +12,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk'
+import { statSync } from 'fs'
 import type { MessageType } from '../components/messages.js'
 import type {
   EvaluationContext,
@@ -61,8 +62,8 @@ const arrow = /(?:→|->|=>)/g.source
 const pass = /(?:✓|✔|PASS|pass|Y\b|true|yes|1)/g.source
 const fail = /(?:✗|✘|FAIL|fail|N\b|false|no|0)/g.source
 const full = new RegExp(
-  `EVAL:\\s*(.+?):\\s*(.+?)\\s*(?:${arrow}|)\\s*(${pass}|${fail})`,
-  'g',
+  `(?:^|\\n)\\s*(?:>)?\\s*EVAL:\\s*(.+?):\\s*(.+?)\\s*(?:${arrow}|)\\s*(${pass}|${fail})`,
+  'gm',
 )
 
 function parseEvalBlocks(text: string): EvalBlock[] {
@@ -237,7 +238,6 @@ const BUILT_IN_RULES: Record<string, (ctx: EvaluationContext, goal: import('../t
     const evidence: import('../types/goal.js').EvalEvidence[] = []
     for (const filePath of ctx.fileList) {
       try {
-        const { statSync } = require('fs') as typeof import('fs')
         statSync(filePath)
         evidence.push({
           source: 'filesystem',

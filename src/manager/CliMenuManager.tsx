@@ -23,6 +23,7 @@ import { Ansi } from '../ink/Ansi.js';
 
 // Config related (using available interfaces)
 import { getGlobalConfig, saveGlobalConfig } from '../utils/config.ts';
+import { writeJsonAtomic } from '../utils/json.js';
 
 // markedSessions stored in ~/.claude-cli/ fixed directory, regardless of cwd
 const MARKED_FILE = path.join(os.homedir(), '.claude-cli', 'markedSessions.json');
@@ -37,100 +38,22 @@ function getBingoSettingsPath(): string {
   return path.join(configDir, 'bingo', 'settings.json');
 }
 
-function readBingoSettings(): Record<string, unknown> {
-  try {
-    const raw = fs.readFileSync(getBingoSettingsPath(), 'utf-8');
-    return JSON.parse(raw) as Record<string, unknown>;
-  } catch {
-    return {};
-  }
+function getGlobalClaudeConfigPath(): string {
+  return path.join(os.homedir(), '.claude.json');
 }
 
-function writeBingoSettings(updates: Record<string, unknown>): void {
-  const p = getBingoSettingsPath();
-  const dir = path.dirname(p);
-  if (!fs.existsSync(dir)) { fs.mkdirSync(dir, { recursive: true }); }
-
-  let current: Record<string, unknown> = {};
-  try {
-    if (fs.existsSync(p)) {
-      const raw = fs.readFileSync(p, 'utf-8');
-      current = JSON.parse(raw) as Record<string, unknown>;
-    }
-  } catch {}
-
-  const merged = { ...current, ...updates };
-
-  // atomic write via temp + rename
-  const tmp = `${p}.tmp.${Date.now()}`;
-  fs.writeFileSync(tmp, JSON.stringify(merged, null, 2) + '\n', 'utf-8');
-  fs.renameSync(tmp, p);
-}
-
-// write yml
-function readGlobalClaudeConfig(): Record<string, unknown> {
-  const configPath = path.join(os.homedir(), '.claude.json');
-  try {
-    const raw = fs.readFileSync(configPath, 'utf-8');
-    return JSON.parse(raw) as Record<string, unknown>;
-  } catch {
-    return {};
-  }
-}
-
-// write merge config directly to ~/.claude.json (atomic write)
-function writeGlobalClaudeConfig(updates: Record<string, unknown>): void {
-  const configPath = path.join(os.homedir(), '.claude.json');
-  const dir = path.dirname(configPath);
-  if (!fs.existsSync(dir)) { fs.mkdirSync(dir, { recursive: true }); }
-
-  let current: Record<string, unknown> = {};
-  try {
-    if (fs.existsSync(configPath)) {
-      const raw = fs.readFileSync(configPath, 'utf-8');
-      current = JSON.parse(raw) as Record<string, unknown>;
-    }
-  } catch {}
-
-  const merged = { ...current, ...updates };
-
-  // atomic write via temp + rename
-  const tmp = `${configPath}.tmp.${Date.now()}`;
-  fs.writeFileSync(tmp, JSON.stringify(merged, null, 2) + '\n', 'utf-8');
-  fs.renameSync(tmp, configPath);
-}
-
-function readClaudeSettings(): Record<string, unknown> {
+function getClaudeSettingsPath(): string {
   const configDir = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude');
-  const settingsPath = path.join(configDir, 'settings.json');
+  return path.join(configDir, 'settings.json');
+}
+
+function readJsonFile(filePath: string): Record<string, unknown> {
   try {
-    const raw = fs.readFileSync(settingsPath, 'utf-8');
+    const raw = fs.readFileSync(filePath, 'utf-8');
     return JSON.parse(raw) as Record<string, unknown>;
   } catch {
     return {};
   }
-}
-
-function writeClaudeSettings(updates: Record<string, unknown>): void {
-  const configDir = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude');
-  const settingsPath = path.join(configDir, 'settings.json');
-  const dir = path.dirname(settingsPath);
-  if (!fs.existsSync(dir)) { fs.mkdirSync(dir, { recursive: true }); }
-
-  let current: Record<string, unknown> = {};
-  try {
-    if (fs.existsSync(settingsPath)) {
-      const raw = fs.readFileSync(settingsPath, 'utf-8');
-      current = JSON.parse(raw) as Record<string, unknown>;
-    }
-  } catch {}
-
-  const merged = { ...current, ...updates };
-
-  // atomic write via temp + rename
-  const tmp = `${settingsPath}.tmp.${Date.now()}`;
-  fs.writeFileSync(tmp, JSON.stringify(merged, null, 2) + '\n', 'utf-8');
-  fs.renameSync(tmp, settingsPath);
 }
 
 /**
@@ -418,7 +341,7 @@ export const CliMenuManager: React.FC = () => {
   // (bypasses configReady to avoid stale lock issues)
   useEffect(() => {
     try {
-      const bSettings = readBingoSettings();
+      const bSettings = readJsonFile(getBingoSettingsPath());
       const bingoLang = bSettings.language as string | undefined;
       if (bingoLang && (bingoLang === 'en' || bingoLang === 'zh' || bingoLang === 'ja')) {
         setLang(bingoLang as Lang);
@@ -716,7 +639,7 @@ export const CliMenuManager: React.FC = () => {
       const langOrder: Lang[] = ['en', 'zh', 'ja'];
       const nextLang = langOrder[(langOrder.indexOf(lang) + 1) % langOrder.length];
       setLang(nextLang);
-      try { writeBingoSettings({ language: nextLang }); } catch {}
+      try { writeJsonAtomic(getBingoSettingsPath(), { language: nextLang }); } catch {}
       return;
     }
 
@@ -894,15 +817,12 @@ export const CliMenuManager: React.FC = () => {
             setAutoModeEnabled(prev => {
               const next = !prev;
               try {
-                writeBingoSettings({ autoModeEnabled: next });
-                const gcfg = readGlobalClaudeConfig();
-                gcfg.cachedGrowthBookFeatures = {
-                  ...(gcfg.cachedGrowthBookFeatures as Record<string, unknown>),
-                  tengu_auto_mode_config: next
-                    ? { enabled: 'enabled', allowModels: ['*'] }
-                    : { enabled: 'disabled' },
-                };
-                writeGlobalClaudeConfig(gcfg);
+                writeJsonAtomic(getBingoSettingsPath(), { autoModeEnabled: next });
+                const gcfg = readJsonFile(getGlobalClaudeConfigPath());
+                gcfg.autoModeConfig = next
+                  ? { enabled: 'enabled', allowModels: ['*'] }
+                  : { enabled: 'disabled' };
+                writeJsonAtomic(getGlobalClaudeConfigPath(), gcfg);
               } catch {
                 return prev; // write failed — keep old state
               }
@@ -913,11 +833,11 @@ export const CliMenuManager: React.FC = () => {
             setBypassPermsEnabled(prev => {
               const next = !prev;
               try {
-                writeBingoSettings({ bypassPermsEnabled: next });
+                writeJsonAtomic(getBingoSettingsPath(), { bypassPermsEnabled: next });
                 const safeSettings = next
                   ? { permissions: { defaultMode: 'bypassPermissions', skipDangerousModePermissionPrompt: true } }
                   : { permissions: { defaultMode: 'default' } };
-                writeClaudeSettings(safeSettings);
+                writeJsonAtomic(getClaudeSettingsPath(), safeSettings);
               } catch {
                 return prev; // write failed — keep old state
               }
@@ -1394,7 +1314,7 @@ export const CliMenuManager: React.FC = () => {
                 initialIndex={tS.langOptions.findIndex(o => o.value === lang)}
                 onSelect={(item: { label: string; value: Lang }) => {
                   setLang(item.value);
-                  try { writeBingoSettings({ language: item.value }); } catch {}
+                  try { writeJsonAtomic(getBingoSettingsPath(), { language: item.value }); } catch {}
                   setSettingsStage('list');
                 }}
               />

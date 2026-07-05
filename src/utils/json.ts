@@ -1,4 +1,6 @@
 import { open, readFile, stat } from 'fs/promises'
+import fs from 'fs'
+import path from 'path'
 import {
   applyEdits,
   modify,
@@ -8,6 +10,34 @@ import { stripBOM } from './jsonRead.js'
 import { logError } from './log.js'
 import { memoizeWithLRU } from './memoize.js'
 import { jsonStringify } from './slowOperations.js'
+
+/**
+ * Atomically read, merge, and write a JSON file.
+ * 1. Reads current file (returns {} if missing)
+ * 2. Merges updates via spread
+ * 3. Writes to temp file then renames (atomic on POSIX, near-atomic on Win)
+ *
+ * Shared utility for config files that are read-merged-written by multiple
+ * call sites (bingo settings, global claude config, claude settings).
+ */
+export function writeJsonAtomic(targetPath: string, updates: Record<string, unknown>): void {
+  const dir = path.dirname(targetPath)
+  if (!fs.existsSync(dir)) { fs.mkdirSync(dir, { recursive: true }) }
+
+  let current: Record<string, unknown> = {}
+  try {
+    if (fs.existsSync(targetPath)) {
+      const raw = fs.readFileSync(targetPath, 'utf-8')
+      current = JSON.parse(raw) as Record<string, unknown>
+    }
+  } catch { /* use empty object */ }
+
+  const merged = { ...current, ...updates }
+
+  const tmp = `${targetPath}.tmp.${Date.now()}`
+  fs.writeFileSync(tmp, JSON.stringify(merged, null, 2) + '\n', 'utf-8')
+  fs.renameSync(tmp, targetPath)
+}
 
 type CachedParse = { ok: true; value: unknown } | { ok: false }
 

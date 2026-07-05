@@ -451,6 +451,11 @@ export type GlobalConfig = {
   // Cached GrowthBook feature values
   cachedGrowthBookFeatures?: { [featureName: string]: unknown }
 
+  // Dedicated auto mode config (set by CliMenuManager UI toggle).
+  // Decoupled from cachedGrowthBookFeatures so the user's choice survives
+  // restarts without relying on a remote eval cache entry.
+  autoModeConfig?: { enabled: string; allowModels?: string[] }
+
   // Local GrowthBook overrides (ant-only, set via /config Gates tab).
   // Checked after env-var overrides but before the real resolved value.
   growthBookOverrides?: { [featureName: string]: unknown }

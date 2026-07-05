@@ -166,8 +166,26 @@ export async function ensureSingletonLocalServer(opts: {
   return { baseUrl, stopIfLast: makeStopIfLast(child.pid, baseUrl), pid: child.pid };
 }
 
-function makeStopIfLast(_serverPid: number, _baseUrl: string) {
+function makeStopIfLast(serverPid: number, baseUrl: string) {
   return async () => {
-    // no-op: only POST /exit from tray can stop server
+    // Last client exiting — stop the server
+    if (countValidLeases() > 0) return;
+    // Try graceful shutdown via /exit first
+    try {
+      await axios.post(baseUrl.replace(/\/+$/, '') + '/exit', {}, { timeout: 3000 });
+    } catch { /* server may already be gone */ }
+    // Hard kill fallback
+    try {
+      if (isPidAlive(serverPid)) {
+        if (process.platform === 'win32') {
+          spawn('taskkill', ['/PID', String(serverPid), '/T', '/F']);
+        } else {
+          process.kill(serverPid, 'SIGTERM');
+        }
+      }
+    } catch { /* already dead */ }
+    // Clean up daemon.lock (used by tray to track server ownership)
+    const daemonLock = path.join(RUNTIME_DIR, 'daemon.lock');
+    rmSafe(daemonLock);
   };
 }

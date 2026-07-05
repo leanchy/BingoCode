@@ -56,7 +56,30 @@ async function build(): Promise<boolean> {
   for (const out of result.outputs) {
     process.stdout.write(`  ✓ ${relative(ROOT, out.path)}  (${(out.size / 1024).toFixed(1)} kB)\n`)
   }
-  process.stdout.write(`[auto-mode] build OK in ${elapsed}ms\n`)
+
+  // ── Verification: confirm feature() macro substitution worked ──
+  const verifyOutputs = result.outputs.filter(o => o.path.endsWith('.js'))
+  let inlined = 0
+  for (const feat of FEATURES) {
+    // When Bun.build({ features: [...] }) works correctly, `feature("FEAT_NAME")`
+    // in source becomes `true` in output and the string "FEAT_NAME" is absent.
+    // If the string still appears, the feature was NOT inlined (DCE cliff or
+    // missing build config).
+    const stillPresent = verifyOutputs.filter(out => {
+      const content = out.text?.()
+      return content && content.includes(feat)
+    })
+    if (stillPresent.length > 0) {
+      process.stdout.write(`  ⚠ "${feat}" string found in ${stillPresent.length} output(s) — NOT inlined. Check Bun DCE budget.\n`)
+    } else {
+      inlined++
+    }
+  }
+  if (inlined === FEATURES.length) {
+    process.stdout.write(`[auto-mode] build OK in ${elapsed}ms (features inlined: ${inlined}/${FEATURES.length})\n`)
+  } else {
+    process.stdout.write(`[auto-mode] build OK in ${elapsed}ms (features inlined: ${inlined}/${FEATURES.length}, see warnings above)\n`)
+  }
   return true
 }
 

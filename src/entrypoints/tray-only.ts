@@ -26,6 +26,18 @@ const STARTUP_DIR = path.join(os.homedir(), 'AppData', 'Roaming', 'Microsoft', '
 const STARTUP_CMD = path.join(STARTUP_DIR, 'Bingo.cmd');
 const REG_KEY = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run';
 const REG_NAME = 'Bingo';
+const TRAY_STATE_FILE = path.join(os.homedir(), '.claude-cli', 'runtime', 'tray-state.json');
+
+/** Persist user intent so crash recovery doesn't remove user-requested entries. */
+function readTrayState(): { autostartUserRequested?: boolean } {
+  try { return JSON.parse(fs.readFileSync(TRAY_STATE_FILE, 'utf-8')); } catch { return {}; }
+}
+function writeTrayState(state: Record<string, unknown>): void {
+  try {
+    fs.mkdirSync(path.dirname(TRAY_STATE_FILE), { recursive: true });
+    fs.writeFileSync(TRAY_STATE_FILE, JSON.stringify(state), 'utf-8');
+  } catch {}
+}
 
 function isAutostartEnabled(): boolean {
   if (process.platform !== 'win32') return false;
@@ -34,6 +46,17 @@ function isAutostartEnabled(): boolean {
     execSync(`reg query "${REG_KEY}" /v ${REG_NAME}`, { stdio: 'ignore' });
     return true;
   } catch { return false; }
+}
+
+/** On startup, clean stale autostart entries only if the user never requested them. */
+function cleanStaleAutostartIfNotRequested(): void {
+  if (process.platform !== 'win32') return;
+  const state = readTrayState();
+  if (state.autostartUserRequested) return;
+  // Entries exist but user didn't request them — likely from a prior crash.
+  // Clean them up to prevent orphan registry entries.
+  try { fs.unlinkSync(STARTUP_CMD); } catch {}
+  try { execSync(`reg delete "${REG_KEY}" /v ${REG_NAME} /f`, { stdio: 'ignore' }); } catch {}
 }
 
 function findBunExe(): string {
@@ -63,21 +86,24 @@ function enableAutostart(): void {
       '',
     ].join('\r\n');
     fs.writeFileSync(STARTUP_CMD, cmd, { encoding: 'utf8' });
-    return;
-  } catch {}
-  // fallback: registry
-  try {
-    const val = `"${bunExe}" "--preload=${preload}" "${trayEntry}"`;
-    execSync(`reg add "${REG_KEY}" /v ${REG_NAME} /t REG_SZ /d "${val}" /f`);
-  } catch (e) {
-    console.error('[tray] Failed to enable autostart:', e);
+  } catch {
+    // fallback: registry
+    try {
+      const val = `"${bunExe}" "--preload=${preload}" "${trayEntry}"`;
+      execSync(`reg add "${REG_KEY}" /v ${REG_NAME} /t REG_SZ /d "${val}" /f`);
+    } catch (e) {
+      console.error('[tray] Failed to enable autostart:', e);
+      return;
+    }
   }
+  writeTrayState({ autostartUserRequested: true });
 }
 
 function disableAutostart(): void {
   if (process.platform !== 'win32') return;
   try { fs.unlinkSync(STARTUP_CMD); } catch {}
   try { execSync(`reg delete "${REG_KEY}" /v ${REG_NAME} /f`, { stdio: 'ignore' }); } catch {}
+  writeTrayState({ autostartUserRequested: false });
 }
 
 // ── Daemon PID lock ──────────────────────────────────────────────────────
@@ -95,6 +121,9 @@ const _iconFallback = 'AAABAAEAEBAAAAEAIACEAAAAFgAAAIlQTkcNChoKAAAADUlIRFIAAAAQA
 const iconB64 = fs.existsSync(_iconFile)
   ? fs.readFileSync(_iconFile).toString('base64')
   : _iconFallback;
+
+// Clean stale autostart entries from previous crashes (only if user didn't request them)
+cleanStaleAutostartIfNotRequested();
 
 try {
   const autostartItem = {

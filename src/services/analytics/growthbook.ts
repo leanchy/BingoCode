@@ -684,10 +684,17 @@ async function getFeatureValueInternal<T>(
     return configOverrides[feature] as T
   }
 
+  // Dedicated autoModeConfig field (set by CliMenuManager) takes priority
+  // over cachedGrowthBookFeatures for tengu_auto_mode_config.
+  const globalConfig = getGlobalConfig()
+  if (feature === 'tengu_auto_mode_config' && globalConfig.autoModeConfig) {
+    return globalConfig.autoModeConfig as T
+  }
+
   if (!isGrowthBookEnabled()) {
     // No network-based GrowthBook; fall back to disk cache via GlobalConfig.
     try {
-      const cc = getGlobalConfig().cachedGrowthBookFeatures
+      const cc = globalConfig.cachedGrowthBookFeatures
       if (cc && feature in cc) return cc[feature] as T
     } catch {}
     return defaultValue
@@ -752,10 +759,19 @@ export function getFeatureValue_CACHED_MAY_BE_STALE<T>(
     return configOverrides[feature] as T
   }
 
+  // Dedicated autoModeConfig field (set by CliMenuManager) takes priority
+  // over cachedGrowthBookFeatures for tengu_auto_mode_config. This decouples
+  // the UI toggle from the GrowthBook feature-cache system — the user's choice
+  // survives across restarts without relying on a remote eval cache entry.
+  const globalConfig = getGlobalConfig()
+  if (feature === 'tengu_auto_mode_config' && globalConfig.autoModeConfig) {
+    return globalConfig.autoModeConfig as T
+  }
+
   if (!isGrowthBookEnabled()) {
     // No network-based GrowthBook; fall back to disk cache via GlobalConfig.
     try {
-      const cc = getGlobalConfig().cachedGrowthBookFeatures
+      const cc = globalConfig.cachedGrowthBookFeatures
       if (cc && feature in cc) return cc[feature] as T
     } catch {}
     return defaultValue
@@ -779,7 +795,7 @@ export function getFeatureValue_CACHED_MAY_BE_STALE<T>(
 
   // Fall back to disk cache (survives across process restarts)
   try {
-    const cached = getGlobalConfig().cachedGrowthBookFeatures?.[feature]
+    const cached = globalConfig.cachedGrowthBookFeatures?.[feature]
     return cached !== undefined ? (cached as T) : defaultValue
   } catch {
     return defaultValue
