@@ -2328,7 +2328,7 @@ function buildBorderText(showFastIcon: boolean, showFastIconHint: boolean, fastM
     segments.push(showFastIconHint ? `${getFastIconString(true, fastModeCooldown)} ${chalk.dim('/fast')}` : getFastIconString(true, fastModeCooldown))
   }
   if (isExecMode) {
-    segments.push(chalk.yellow('» EXEC'))))
+    segments.push(chalk.yellow('» EXEC'))
   }
   return { content: ` ${segments.join(' ')} `, position: 'top', align: 'end', offset: 0 }
 }
